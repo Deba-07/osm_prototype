@@ -3,9 +3,21 @@
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
 import { evaluators as initialEvaluators } from "@/data/evaluators"
+import { exams } from "@/data/exams"
+import { departments } from "@/data/departments"
+import { programs } from "@/data/programs"
+import { semesters } from "@/data/semesters"
 import { students as initialStudents } from "@/data/students"
+import { subjects } from "@/data/subjects"
+import { validateAnswerSheetIntakeInput } from "@/lib/answer-sheets"
+import {
+  validateAssignment,
+  type AnswerSheetAssignmentInput,
+  type AnswerSheetAssignmentResult,
+} from "@/lib/assignments"
 import type {
   AnswerSheet,
+  AnswerSheetIntakeInput,
   Evaluation,
   EvaluationDraftInput,
   Evaluator,
@@ -29,12 +41,12 @@ type OsmStoreActions = {
   loginAsEvaluator: (evaluatorId: string) => boolean
   logout: () => void
   registerEvaluator: (input: EvaluatorRegistrationInput) => Evaluator
-  approveEvaluator: (evaluatorId: string) => void
-  rejectEvaluator: (evaluatorId: string) => void
+  createAnswerSheet: (input: AnswerSheetIntakeInput) => AnswerSheet | undefined
+  approveEvaluator: (evaluatorId: string) => boolean
+  rejectEvaluator: (evaluatorId: string) => boolean
   assignAnswerSheets: (
-    answerSheetIds: string[],
-    evaluatorId: string
-  ) => number
+    input: AnswerSheetAssignmentInput
+  ) => AnswerSheetAssignmentResult
   saveEvaluationDraft: (
     input: EvaluationDraftInput
   ) => Evaluation | undefined
@@ -125,7 +137,47 @@ export const useOsmStore = create<OsmStore>()(
 
         return evaluator
       },
+      createAnswerSheet: (input) => {
+        const validation = validateAnswerSheetIntakeInput({
+          input,
+          answerSheets: get().answerSheets,
+          students: get().students,
+          subjects,
+          semesters,
+          exams,
+        })
+
+        if (!validation.success) {
+          return undefined
+        }
+
+        const answerSheet: AnswerSheet = {
+          id: createDemoId("as"),
+          studentId: validation.data.studentId,
+          subjectId: validation.data.subjectId,
+          examId: validation.data.examId,
+          semesterId: validation.data.semesterId,
+          pageImages: validation.data.pageImages
+            ? [...validation.data.pageImages]
+            : [],
+          status: "unassigned",
+        }
+
+        set((state) => ({
+          answerSheets: [answerSheet, ...state.answerSheets],
+        }))
+
+        return answerSheet
+      },
       approveEvaluator: (evaluatorId) => {
+        const evaluator = get().evaluators.find(
+          (item) => item.id === evaluatorId
+        )
+
+        if (!evaluator || evaluator.status !== "pending") {
+          return false
+        }
+
         set((state) => ({
           evaluators: state.evaluators.map((evaluator) =>
             evaluator.id === evaluatorId
@@ -133,8 +185,18 @@ export const useOsmStore = create<OsmStore>()(
               : evaluator
           ),
         }))
+
+        return true
       },
       rejectEvaluator: (evaluatorId) => {
+        const evaluator = get().evaluators.find(
+          (item) => item.id === evaluatorId
+        )
+
+        if (!evaluator || evaluator.status !== "pending") {
+          return false
+        }
+
         set((state) => ({
           evaluators: state.evaluators.map((evaluator) =>
             evaluator.id === evaluatorId
@@ -142,42 +204,41 @@ export const useOsmStore = create<OsmStore>()(
               : evaluator
           ),
         }))
-      },
-      assignAnswerSheets: (answerSheetIds, evaluatorId) => {
-        const evaluator = get().evaluators.find(
-          (item) => item.id === evaluatorId && item.status === "approved"
-        )
 
-        if (!evaluator) {
-          return 0
+        return true
+      },
+      assignAnswerSheets: (input) => {
+        const validation = validateAssignment({
+          input,
+          answerSheets: get().answerSheets,
+          students: get().students,
+          departments,
+          programs,
+          semesters,
+          subjects,
+          exams,
+          evaluators: get().evaluators,
+        })
+
+        if (!validation.success) {
+          return validation
         }
 
-        const answerSheetIdSet = new Set(answerSheetIds)
-        let assignedCount = 0
+        const answerSheetIdSet = new Set(validation.answerSheetIds)
 
         set((state) => ({
-          answerSheets: state.answerSheets.map((answerSheet) => {
-            if (
-              !answerSheetIdSet.has(answerSheet.id) ||
-              answerSheet.status === "completed"
-            ) {
-              return answerSheet
-            }
-
-            assignedCount += 1
-
-            return {
-              ...answerSheet,
-              assignedEvaluatorId: evaluator.id,
-              status:
-                answerSheet.status === "unassigned"
-                  ? "assigned"
-                  : answerSheet.status,
-            }
-          }),
+          answerSheets: state.answerSheets.map((answerSheet) =>
+            answerSheetIdSet.has(answerSheet.id)
+              ? {
+                  ...answerSheet,
+                  assignedEvaluatorId: validation.evaluatorId,
+                  status: "assigned",
+                }
+              : answerSheet
+          ),
         }))
 
-        return assignedCount
+        return validation
       },
       saveEvaluationDraft: (input) => {
         const answerSheet = get().answerSheets.find(

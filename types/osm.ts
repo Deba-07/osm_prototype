@@ -91,6 +91,13 @@ export type AnswerSheet = {
   status: AnswerSheetStatus
 }
 
+export type AnswerSheetIntakeInput = Omit<
+  AnswerSheet,
+  "id" | "assignedEvaluatorId" | "status" | "pageImages"
+> & {
+  pageImages?: string[]
+}
+
 export type QuestionMark = {
   questionId: string
   questionNumber: string

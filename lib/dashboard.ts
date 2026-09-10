@@ -7,6 +7,9 @@ import type {
   Student,
   Subject,
 } from "@/types/osm"
+import { answerSheetStatusLabels, answerSheetStatuses } from "@/lib/answer-sheets"
+
+export { answerSheetStatusLabels } from "@/lib/answer-sheets"
 
 export type AnswerSheetStatusCount = {
   status: AnswerSheetStatus
@@ -59,20 +62,6 @@ export type RecentEvaluationActivity = {
 
 type ActiveActivityAnswerSheet = AnswerSheet & {
   status: "in_progress" | "assigned"
-}
-
-const answerSheetStatuses: AnswerSheetStatus[] = [
-  "completed",
-  "in_progress",
-  "assigned",
-  "unassigned",
-]
-
-export const answerSheetStatusLabels: Record<AnswerSheetStatus, string> = {
-  completed: "Completed",
-  in_progress: "In Progress",
-  assigned: "Assigned",
-  unassigned: "Unassigned",
 }
 
 function isActiveActivityAnswerSheet(

@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { departments } from "@/data/departments"
 import { subjects } from "@/data/subjects"
 import { universityContext } from "@/data/university"
+import { useOsmStoreHydrated } from "@/hooks/use-osm-store-hydrated"
 import {
   getAdminDashboardSummary,
   getDepartmentEvaluationProgress,
@@ -27,34 +28,6 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useSyncExternalStore } from "react"
-
-function subscribeToPersistHydration(onStoreChange: () => void) {
-  const unsubscribeHydrate = useOsmStore.persist.onHydrate(onStoreChange)
-  const unsubscribeFinishHydration =
-    useOsmStore.persist.onFinishHydration(onStoreChange)
-
-  return () => {
-    unsubscribeHydrate()
-    unsubscribeFinishHydration()
-  }
-}
-
-function getClientHydrationSnapshot() {
-  return useOsmStore.persist.hasHydrated()
-}
-
-function getServerHydrationSnapshot() {
-  return false
-}
-
-function usePersistedStoreHydrated() {
-  return useSyncExternalStore(
-    subscribeToPersistHydration,
-    getClientHydrationSnapshot,
-    getServerHydrationSnapshot
-  )
-}
 
 function DashboardSkeleton() {
   return (
@@ -78,7 +51,7 @@ function DashboardSkeleton() {
 }
 
 export function AdminDashboard() {
-  const isHydrated = usePersistedStoreHydrated()
+  const isHydrated = useOsmStoreHydrated()
   const currentUser = useOsmStore((state) => state.currentUser)
   const students = useOsmStore((state) => state.students)
   const evaluators = useOsmStore((state) => state.evaluators)
