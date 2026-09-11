@@ -53,7 +53,7 @@ export const initialEvaluations: Evaluation[] = answerSheets
       examId: answerSheet.examId,
       questionMarks,
       totalMarks: questionMarks.reduce(
-        (total, question) => total + question.marksAwarded,
+        (total, question) => total + (question.marksAwarded ?? 0),
         0
       ),
       status: "submitted",

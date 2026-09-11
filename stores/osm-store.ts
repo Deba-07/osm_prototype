@@ -6,6 +6,7 @@ import { evaluators as initialEvaluators } from "@/data/evaluators"
 import { exams } from "@/data/exams"
 import { departments } from "@/data/departments"
 import { programs } from "@/data/programs"
+import { examQuestions } from "@/data/questions"
 import { semesters } from "@/data/semesters"
 import { students as initialStudents } from "@/data/students"
 import { subjects } from "@/data/subjects"
@@ -15,6 +16,10 @@ import {
   type AnswerSheetAssignmentInput,
   type AnswerSheetAssignmentResult,
 } from "@/lib/assignments"
+import {
+  validateEvaluationDraftInput,
+  validateEvaluationSubmissionInput,
+} from "@/lib/evaluations"
 import type {
   AnswerSheet,
   AnswerSheetIntakeInput,
@@ -90,6 +95,34 @@ function cloneInitialState(): OsmStoreState {
       })),
     })),
   }
+}
+
+function upsertEvaluation(
+  evaluations: Evaluation[],
+  nextEvaluation: Evaluation
+) {
+  let hasReplacedEvaluation = false
+  const nextEvaluations: Evaluation[] = []
+
+  for (const evaluation of evaluations) {
+    const isSameEvaluationPair =
+      evaluation.answerSheetId === nextEvaluation.answerSheetId &&
+      evaluation.evaluatorId === nextEvaluation.evaluatorId
+
+    if (!isSameEvaluationPair) {
+      nextEvaluations.push(evaluation)
+      continue
+    }
+
+    if (!hasReplacedEvaluation) {
+      nextEvaluations.push(nextEvaluation)
+      hasReplacedEvaluation = true
+    }
+  }
+
+  return hasReplacedEvaluation
+    ? nextEvaluations
+    : [...nextEvaluations, nextEvaluation]
 }
 
 export const useOsmStore = create<OsmStore>()(
@@ -241,57 +274,47 @@ export const useOsmStore = create<OsmStore>()(
         return validation
       },
       saveEvaluationDraft: (input) => {
-        const answerSheet = get().answerSheets.find(
-          (item) => item.id === input.answerSheetId
-        )
-        const evaluator = get().evaluators.find(
-          (item) => item.id === input.evaluatorId && item.status === "approved"
-        )
+        const validation = validateEvaluationDraftInput({
+          input,
+          answerSheets: get().answerSheets,
+          evaluators: get().evaluators,
+          questions: examQuestions,
+        })
 
-        if (!answerSheet || !evaluator || answerSheet.status === "completed") {
+        if (!validation.success) {
           return undefined
         }
 
         const now = new Date().toISOString()
-        const questionMarks = input.questionMarks.map((questionMark) => ({
+        const questionMarks = validation.questionMarks.map((questionMark) => ({
           ...questionMark,
         }))
-        const totalMarks = questionMarks.reduce(
-          (total, questionMark) => total + questionMark.marksAwarded,
-          0
-        )
         const existingEvaluation = get().evaluations.find(
           (evaluation) =>
-            evaluation.answerSheetId === answerSheet.id &&
-            evaluation.evaluatorId === evaluator.id
+            evaluation.answerSheetId === validation.answerSheet.id &&
+            evaluation.evaluatorId === validation.evaluator.id
         )
         const draftEvaluation: Evaluation = {
           id: existingEvaluation?.id ?? createDemoId("evaluation"),
-          answerSheetId: answerSheet.id,
-          evaluatorId: evaluator.id,
-          studentId: answerSheet.studentId,
-          subjectId: answerSheet.subjectId,
-          semesterId: answerSheet.semesterId,
-          examId: answerSheet.examId,
+          answerSheetId: validation.answerSheet.id,
+          evaluatorId: validation.evaluator.id,
+          studentId: validation.answerSheet.studentId,
+          subjectId: validation.answerSheet.subjectId,
+          semesterId: validation.answerSheet.semesterId,
+          examId: validation.answerSheet.examId,
           questionMarks,
-          totalMarks,
+          totalMarks: validation.totalMarks,
           status: "draft",
           startedAt: existingEvaluation?.startedAt ?? now,
         }
 
         set((state) => ({
-          evaluations: existingEvaluation
-            ? state.evaluations.map((evaluation) =>
-                evaluation.id === existingEvaluation.id
-                  ? draftEvaluation
-                  : evaluation
-              )
-            : [...state.evaluations, draftEvaluation],
+          evaluations: upsertEvaluation(state.evaluations, draftEvaluation),
           answerSheets: state.answerSheets.map((item) =>
-            item.id === answerSheet.id
+            item.id === validation.answerSheet.id
               ? {
                   ...item,
-                  assignedEvaluatorId: evaluator.id,
+                  assignedEvaluatorId: validation.evaluator.id,
                   status: "in_progress",
                 }
               : item
@@ -301,27 +324,49 @@ export const useOsmStore = create<OsmStore>()(
         return draftEvaluation
       },
       submitEvaluation: (input) => {
-        const draftEvaluation = get().saveEvaluationDraft(input)
+        const validation = validateEvaluationSubmissionInput({
+          input,
+          answerSheets: get().answerSheets,
+          evaluators: get().evaluators,
+          questions: examQuestions,
+        })
 
-        if (!draftEvaluation) {
+        if (!validation.success) {
           return undefined
         }
 
+        const now = new Date().toISOString()
+        const existingEvaluation = get().evaluations.find(
+          (evaluation) =>
+            evaluation.answerSheetId === validation.answerSheet.id &&
+            evaluation.evaluatorId === validation.evaluator.id
+        )
         const submittedEvaluation: Evaluation = {
-          ...draftEvaluation,
+          id: existingEvaluation?.id ?? createDemoId("evaluation"),
+          answerSheetId: validation.answerSheet.id,
+          evaluatorId: validation.evaluator.id,
+          studentId: validation.answerSheet.studentId,
+          subjectId: validation.answerSheet.subjectId,
+          semesterId: validation.answerSheet.semesterId,
+          examId: validation.answerSheet.examId,
+          questionMarks: validation.questionMarks.map((questionMark) => ({
+            ...questionMark,
+          })),
+          totalMarks: validation.totalMarks,
           status: "submitted",
-          submittedAt: new Date().toISOString(),
+          startedAt: existingEvaluation?.startedAt ?? now,
+          submittedAt: now,
         }
 
         set((state) => ({
-          evaluations: state.evaluations.map((evaluation) =>
-            evaluation.id === draftEvaluation.id
-              ? submittedEvaluation
-              : evaluation
-          ),
+          evaluations: upsertEvaluation(state.evaluations, submittedEvaluation),
           answerSheets: state.answerSheets.map((answerSheet) =>
-            answerSheet.id === draftEvaluation.answerSheetId
-              ? { ...answerSheet, status: "completed" }
+            answerSheet.id === validation.answerSheet.id
+              ? {
+                  ...answerSheet,
+                  assignedEvaluatorId: validation.evaluator.id,
+                  status: "completed",
+                }
               : answerSheet
           ),
         }))

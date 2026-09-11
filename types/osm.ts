@@ -102,7 +102,7 @@ export type QuestionMark = {
   questionId: string
   questionNumber: string
   maximumMarks: number
-  marksAwarded: number
+  marksAwarded: number | null
 }
 
 export type EvaluationStatus = "draft" | "submitted"
