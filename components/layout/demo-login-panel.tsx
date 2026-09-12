@@ -43,9 +43,10 @@ export function DemoLoginPanel() {
   return (
     <Card className="max-w-xl">
       <CardHeader>
-        <CardTitle>Demo access</CardTitle>
+        <CardTitle>Choose Demo Role</CardTitle>
         <CardDescription>
-          Switch between the two prototype roles without real authentication.
+          Open the University Admin dashboard or continue as an approved
+          evaluator.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -56,12 +57,12 @@ export function DemoLoginPanel() {
             onClick={handleAdminLogin}
           >
             <ShieldCheck data-icon="inline-start" className="size-4" />
-            Login as admin
+            University Admin
           </Button>
           <div className="space-y-2">
             {isHydrated ? (
               <>
-                <Label htmlFor="demo-evaluator">Evaluator account</Label>
+                <Label htmlFor="demo-evaluator">Approved Evaluator</Label>
                 <select
                   id="demo-evaluator"
                   className={cn(
@@ -87,7 +88,7 @@ export function DemoLoginPanel() {
                   onClick={handleEvaluatorLogin}
                 >
                   <UserCheck data-icon="inline-start" className="size-4" />
-                  Login as evaluator
+                  Evaluator
                 </Button>
               </>
             ) : (

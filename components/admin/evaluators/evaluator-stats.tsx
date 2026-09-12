@@ -23,13 +23,13 @@ export function EvaluatorStats({ counts }: EvaluatorStatsProps) {
     {
       title: "Approved",
       value: counts.approved,
-      description: "Eligible for future answer-sheet assignment.",
+      description: "Eligible for answer-sheet assignment.",
       icon: UserCheck,
     },
     {
       title: "Rejected",
       value: counts.rejected,
-      description: "Not eligible for future assignment.",
+      description: "Not eligible for answer-sheet assignment.",
       icon: UserRoundX,
     },
   ]

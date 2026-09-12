@@ -11,7 +11,6 @@ import {
   type RecentEvaluationActivity,
 } from "@/lib/dashboard"
 import type { AnswerSheetStatus } from "@/types/osm"
-import { formatDistanceToNow } from "date-fns"
 
 const statusClasses: Record<RecentEvaluationActivity["status"], string> = {
   completed:
@@ -37,7 +36,13 @@ function formatActivityTime(timestamp?: string) {
     return "Submitted"
   }
 
-  return formatDistanceToNow(date, { addSuffix: true })
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
 }
 
 export function RecentActivity({ activities }: RecentActivityProps) {

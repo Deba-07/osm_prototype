@@ -21,7 +21,7 @@ export const evaluators: Evaluator[] = [
     facultyId: "DSU-FAC-CSE-021",
     departmentId: "dept-cse",
     designation: "Professor",
-    subjectExpertise: ["sub-cse-os", "sub-cse-dsa"],
+    subjectExpertise: ["sub-cse-os", "sub-cse-dsa", "sub-cse-dbms"],
     experienceYears: 16,
     status: "approved",
   },

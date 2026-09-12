@@ -146,11 +146,13 @@ export function AnswerSheetViewer({
                   aria-hidden="true"
                 />
               )}
-              <p className="text-base font-medium">Demo Answer Sheet</p>
+              <p className="text-base font-medium">
+                Demo scanned answer sheet preview
+              </p>
               <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                 {pageCount > 0
-                  ? "Scanned page preview is not available for this mock record."
-                  : "No scanned page paths are attached to this answer sheet."}
+                  ? "Sample scan asset is not available for this record."
+                  : "No sample scan asset is attached to this record."}
               </p>
               <p className="mt-4 text-xs font-medium uppercase tracking-normal text-muted-foreground">
                 {answerSheetId}

@@ -1,11 +1,14 @@
+"use client"
+
+import { DemoSessionControls } from "@/components/layout/demo-session-controls"
 import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
   FileStack,
-  GraduationCap,
   LayoutDashboard,
   ListChecks,
   School,
@@ -14,6 +17,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
 
 type NavigationItem = {
@@ -85,7 +89,13 @@ const evaluatorNavigation: NavigationItem[] = [
   },
 ]
 
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
 function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
+  const pathname = usePathname()
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 shrink-0 border-r bg-muted/25 md:flex md:flex-col">
@@ -97,7 +107,7 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
             <Link href="/" className="text-base font-semibold">
               OSM
             </Link>
-            <p className="text-xs text-muted-foreground">Prototype</p>
+            <p className="text-xs text-muted-foreground">Demo workspace</p>
           </div>
         </div>
         <Separator />
@@ -108,12 +118,19 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
           <nav className="mt-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
+              const isActive = isActivePath(pathname, item.href)
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex h-9 items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "flex h-9 items-center gap-2 rounded-lg px-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
                 >
                   <Icon className="size-4" aria-hidden="true" />
                   {item.label}
@@ -123,19 +140,13 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
           </nav>
         </div>
         <div className="mt-auto border-t p-4">
-          <Link
-            href="/login"
-            className="flex h-9 items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <GraduationCap className="size-4" aria-hidden="true" />
-            Switch demo user
-          </Link>
+          <DemoSessionControls />
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b bg-background/95 px-4 py-4 md:px-8">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
                 {subtitle}
@@ -143,16 +154,29 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
               <p className="text-base font-semibold">{title}</p>
             </div>
             <nav className="flex gap-2 overflow-x-auto pb-1 md:hidden">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = isActivePath(pathname, item.href)
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors",
+                      isActive
+                        ? "border-primary/30 bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="size-3.5" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                )
+              })}
             </nav>
+            <DemoSessionControls compact className="md:hidden" />
           </div>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8">{children}</main>

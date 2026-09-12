@@ -145,7 +145,7 @@ export function EvaluatorsPage() {
           </h1>
           <p className="text-sm leading-6 text-muted-foreground">
             Review faculty registrations and approve only eligible evaluators
-            for future answer-sheet assignment.
+            for answer-sheet assignment.
           </p>
         </div>
         <Button variant="outline" render={<Link href="/register/evaluator" />}>

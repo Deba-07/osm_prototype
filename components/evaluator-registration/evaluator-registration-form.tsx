@@ -217,7 +217,7 @@ export function EvaluatorRegistrationForm() {
               <div>
                 <h2 className="text-base font-medium">Personal Information</h2>
                 <p className="text-sm text-muted-foreground">
-                  Contact details for verification and future assignment
+                  Contact details for verification and answer-sheet assignment
                   communication.
                 </p>
               </div>

@@ -147,6 +147,16 @@ export function EvaluationWorkspace({
       }),
     [evaluation, questions]
   )
+  const initialQuestionMarksKey = useMemo(
+    () =>
+      initialQuestionMarks
+        .map(
+          (questionMark) =>
+            `${questionMark.questionId}:${questionMark.marksAwarded ?? ""}`
+        )
+        .join("|"),
+    [initialQuestionMarks]
+  )
   const maximumMarks = useMemo(
     () => calculateEvaluationMaximumMarks(questions),
     [questions]
@@ -261,6 +271,7 @@ export function EvaluationWorkspace({
             evaluation?.id ?? "new",
             evaluation?.status ?? "none",
             evaluation?.submittedAt ?? "draft",
+            initialQuestionMarksKey,
           ].join(":")}
           answerSheetId={answerSheet.id}
           evaluatorId={evaluator.id}

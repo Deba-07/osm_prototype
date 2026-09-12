@@ -1,7 +1,7 @@
 "use client"
 
-import { EvaluatorStatusBadge } from "@/components/admin/evaluators/evaluator-status-badge"
 import {
+  EvaluatorStatusBadge,
   evaluatorStatusLabels,
 } from "@/components/admin/evaluators/evaluator-status-badge"
 import {

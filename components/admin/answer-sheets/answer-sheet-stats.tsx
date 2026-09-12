@@ -27,7 +27,7 @@ export function AnswerSheetStats({ counts }: AnswerSheetStatsProps) {
       <DashboardStatCard
         title="Unassigned"
         value={counts.unassigned}
-        description="Sheets ready for the future assignment workflow."
+        description="Sheets ready for the assignment workflow."
         icon={Inbox}
       />
       <DashboardStatCard

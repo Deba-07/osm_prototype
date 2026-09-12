@@ -190,7 +190,7 @@ export function AnswerSheetsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Answer-sheet records</CardTitle>
+          <CardTitle>Answer Sheet Records</CardTitle>
           <CardDescription>
             Existing seeded sheets and simulated intake records from the
             persisted demo store.

@@ -146,6 +146,7 @@ export function QuestionMarkForm({
     () => getSnapshot(buildMarkValues(initialQuestionMarks)),
     [initialQuestionMarks]
   )
+  const [savedSnapshot, setSavedSnapshot] = useState(initialSnapshot)
   const currentSnapshot = useMemo(() => getSnapshot(markValues), [markValues])
   const currentQuestionMarks = useMemo(
     () => buildQuestionMarks(questions, markValues),
@@ -171,7 +172,7 @@ export function QuestionMarkForm({
   const completion = getEvaluationCompletion(currentQuestionMarks)
   const totalMarks = calculateEvaluationTotal(currentQuestionMarks)
   const hasValidDraftMarks = draftValidation.success
-  const hasUnsavedChanges = currentSnapshot !== initialSnapshot
+  const hasUnsavedChanges = currentSnapshot !== savedSnapshot
   const totalMarksLabel = Number.isFinite(totalMarks)
     ? formatMarks(totalMarks)
     : "Invalid"
@@ -208,8 +209,12 @@ export function QuestionMarkForm({
       return
     }
 
+    const savedMarkValues = buildMarkValues(savedEvaluation.questionMarks)
+
+    setMarkValues(savedMarkValues)
+    setSavedSnapshot(getSnapshot(savedMarkValues))
     setHasTriedSubmit(false)
-    toast.success("Draft saved")
+    toast.success("Draft saved.")
   }
 
   function handleSubmitRequest() {
@@ -242,8 +247,14 @@ export function QuestionMarkForm({
       return
     }
 
+    const submittedMarkValues = buildMarkValues(
+      submittedEvaluation.questionMarks
+    )
+
+    setMarkValues(submittedMarkValues)
+    setSavedSnapshot(getSnapshot(submittedMarkValues))
     setIsSubmitDialogOpen(false)
-    toast.success("Evaluation submitted")
+    toast.success("Evaluation submitted successfully.")
   }
 
   if (questions.length === 0) {

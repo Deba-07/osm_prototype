@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -11,7 +12,7 @@ import { departments } from "@/data/departments"
 import { evaluators } from "@/data/evaluators"
 import { students } from "@/data/students"
 import { universityContext } from "@/data/university"
-import { ArrowRight, School } from "lucide-react"
+import { ArrowRight, School, UserPlus } from "lucide-react"
 import Link from "next/link"
 
 export default function Home() {
@@ -37,38 +38,31 @@ export default function Home() {
 
           <div className="max-w-3xl space-y-4">
             <Badge variant="secondary">
-              {universityContext.academicYear} prototype
+              OSM demo | {universityContext.academicYear}
             </Badge>
             <h1 className="text-3xl font-semibold tracking-normal md:text-4xl">
-              Answer-sheet evaluation foundation
+              OSM University Answer Sheet Evaluation System
             </h1>
             <p className="text-base leading-7 text-muted-foreground">
-              A typed demo base for university answer-sheet evaluation,
-              evaluator approval, assignment tracking, result derivation, and
-              ranking foundations.
+              A frontend demo for evaluator verification, answer-sheet
+              assignment, question-wise marking, academic results, and
+              rankings.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/login"
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+            <Button size="lg" render={<Link href="/login" />}>
+              Open Demo
+              <ArrowRight data-icon="inline-end" className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              render={<Link href="/register/evaluator" />}
             >
-              Open demo login
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-            <Link
-              href="/admin/dashboard"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              Admin routes
-            </Link>
-            <Link
-              href="/evaluator/dashboard"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              Evaluator routes
-            </Link>
+              <UserPlus data-icon="inline-start" className="size-4" />
+              Evaluator Registration
+            </Button>
           </div>
         </div>
       </section>
@@ -92,16 +86,16 @@ export default function Home() {
       <section className="mx-auto w-full max-w-6xl px-4 pb-10 md:px-8">
         <Card>
           <CardHeader>
-            <CardTitle>Foundation status</CardTitle>
+            <CardTitle>Demo readiness</CardTitle>
             <CardDescription>
-              Routes, typed mock data, and demo state are ready for the next
-              workflow tasks.
+              Core university evaluation workflows are connected through typed
+              mock data and persisted demo state.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
             <p>Mock data is fictional and internally linked by stable IDs.</p>
             <p>Results and rankings are derived from submitted evaluations.</p>
-            <p>Answer-sheet image paths are modeled but assets are not present.</p>
+            <p>Scan previews use a polished fallback when sample assets are unavailable.</p>
           </CardContent>
         </Card>
       </section>

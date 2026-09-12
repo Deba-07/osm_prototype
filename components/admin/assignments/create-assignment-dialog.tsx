@@ -543,7 +543,7 @@ export function CreateAssignmentDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Assign answer sheets</DialogTitle>
+            <DialogTitle>Assign Answer Sheets</DialogTitle>
             <DialogDescription>
               Choose an academic context, select an approved evaluator, and
               assign only eligible unassigned sheets.
@@ -866,7 +866,7 @@ export function CreateAssignmentDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Assign {form.answerSheetIds.length} answer sheets?
+              Assign {form.answerSheetIds.length} Answer Sheets?
             </AlertDialogTitle>
             <AlertDialogDescription>
               {selectedEvaluator?.name ?? "The selected evaluator"} will receive{" "}

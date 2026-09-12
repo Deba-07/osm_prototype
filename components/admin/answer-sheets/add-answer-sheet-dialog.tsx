@@ -220,11 +220,11 @@ export function AddAnswerSheetDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Add answer sheet</DialogTitle>
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+          <DialogTitle>Add Answer Sheet</DialogTitle>
           <DialogDescription>
-            Create a prototype answer-sheet record for the evaluation intake
+            Create a simulated answer-sheet record for the evaluation intake
             pool.
           </DialogDescription>
         </DialogHeader>

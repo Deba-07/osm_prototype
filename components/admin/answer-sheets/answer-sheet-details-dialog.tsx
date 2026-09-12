@@ -42,7 +42,7 @@ export function AnswerSheetDetailsDialog({
       {row ? (
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Answer sheet details</DialogTitle>
+            <DialogTitle>Answer Sheet Details</DialogTitle>
             <DialogDescription>
               Inspect the academic record, assignment state, and modeled scan
               page count for this answer sheet.
@@ -135,7 +135,7 @@ export function AnswerSheetDetailsDialog({
             <section className="space-y-3">
               <div>
                 <h3 className="text-sm font-medium">
-                  Scanned answer-sheet preview
+                  Scanned Answer Sheet Preview
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Demo scan assets have not been added yet.
