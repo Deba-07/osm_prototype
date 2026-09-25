@@ -10,6 +10,8 @@ import {
   ClipboardList,
   FileStack,
   LayoutDashboard,
+  Building2,
+  MapPinned,
   ListChecks,
   School,
   Trophy,
@@ -43,6 +45,16 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/students",
     label: "Students",
     icon: Users,
+  },
+  {
+    href: "/admin/institute",
+    label: "Institute",
+    icon: Building2,
+  },
+  {
+    href: "/admin/nodal-centres",
+    label: "Nodal Centres",
+    icon: MapPinned,
   },
   {
     href: "/admin/evaluators",

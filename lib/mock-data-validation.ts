@@ -1,4 +1,6 @@
 import { answerSheets } from "@/data/answer-sheets"
+import { affiliatedColleges } from "@/data/colleges"
+import { nodalCentres } from "@/data/nodal-centres"
 import {
   examInCharges,
   exams,
@@ -9,6 +11,7 @@ import { initialEvaluations } from "@/data/evaluations"
 import { examQuestions } from "@/data/questions"
 import { semesters } from "@/data/semesters"
 import { subjects } from "@/data/subjects"
+import { universityContext } from "@/data/university"
 import type { ExamPaperType } from "@/types/osm"
 
 export type MockDataValidationResult = {
@@ -52,8 +55,70 @@ export function validateMockDataRelationships(): MockDataValidationResult {
   const questionPaperIds = collectIds(questionPapers)
   const markingSchemeIds = collectIds(markingSchemes)
   const examInChargeIds = collectIds(examInCharges)
+  const collegeIds = collectIds(affiliatedColleges)
+  const universityIds = new Set([universityContext.id])
   const answerSheetIds = collectIds(answerSheets)
   const questionIds = collectIds(examQuestions)
+
+  for (const nodalCentre of nodalCentres) {
+    if (!universityIds.has(nodalCentre.instituteId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "Nodal centre",
+        entityId: nodalCentre.id,
+        field: "institute",
+        referencedId: nodalCentre.instituteId,
+      })
+    }
+
+    const college = affiliatedColleges.find(
+      (item) => item.id === nodalCentre.affiliatedCollegeId
+    )
+
+    if (!college) {
+      addMissingReferenceError({
+        errors,
+        entity: "Nodal centre",
+        entityId: nodalCentre.id,
+        field: "affiliated college",
+        referencedId: nodalCentre.affiliatedCollegeId,
+      })
+    } else if (college.instituteId !== nodalCentre.instituteId) {
+      errors.push(
+        `Nodal centre ${nodalCentre.id} crosses institutes between ${nodalCentre.instituteId} and ${college.instituteId}.`
+      )
+    }
+  }
+
+  if (!examInChargeIds.has(universityContext.examInChargeId)) {
+    addMissingReferenceError({
+      errors,
+      entity: "University",
+      entityId: universityContext.id,
+      field: "exam-in-charge",
+      referencedId: universityContext.examInChargeId,
+    })
+  }
+
+  for (const collegeId of universityContext.affiliatedCollegeIds) {
+    if (!collegeIds.has(collegeId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "University",
+        entityId: universityContext.id,
+        field: "affiliated college",
+        referencedId: collegeId,
+      })
+    }
+  }
+
+  for (const college of affiliatedColleges) {
+    if (college.instituteId !== universityContext.id) {
+      errors.push(
+        `Affiliated college ${college.id} belongs to ${college.instituteId}, not ${universityContext.id}.`
+      )
+    }
+  }
 
   for (const exam of exams) {
     if (!semesterIds.has(exam.semesterId)) {

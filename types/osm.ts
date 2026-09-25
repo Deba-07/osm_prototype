@@ -3,6 +3,62 @@ export type UniversityContext = {
   name: string
   code: string
   academicYear: string
+  examInChargeId: string
+  city: string
+  state: string
+  country: string
+  pin: string
+  affiliatedCollegeIds: string[]
+}
+
+export type AffiliatedCollegeStatus = "active" | "inactive"
+
+export type AffiliatedCollege = {
+  id: string
+  name: string
+  code: string
+  city: string
+  state: string
+  instituteId: string
+  status: AffiliatedCollegeStatus
+  importedAt?: string
+}
+
+export type CollegeImportStatus =
+  | "ready"
+  | "processing"
+  | "imported"
+  | "validation_issue"
+
+export type CollegeImportState = {
+  status: CollegeImportStatus
+  importedCount: number
+  validationIssues: string[]
+  processedAt?: string
+}
+
+export type NodalCentreStatus = "active" | "inactive" | "pending"
+
+export type CentreSuperintendent = {
+  name: string
+  email: string
+  phone: string
+}
+
+export type NodalCentre = {
+  id: string
+  name: string
+  code: string
+  instituteId: string
+  affiliatedCollegeId: string
+  address: string
+  city: string
+  state: string
+  country: string
+  pin: string
+  superintendent: CentreSuperintendent
+  status: NodalCentreStatus
+  createdAt: string
 }
 
 export type Department = {

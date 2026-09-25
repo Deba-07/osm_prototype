@@ -2,6 +2,11 @@
 
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
+import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
+import {
+  affiliatedColleges as initialAffiliatedColleges,
+  mockImportedColleges,
+} from "@/data/colleges"
 import { evaluators as initialEvaluators } from "@/data/evaluators"
 import {
   examInCharges as initialExamInCharges,
@@ -27,7 +32,9 @@ import {
 } from "@/lib/evaluations"
 import type {
   AnswerSheet,
+  AffiliatedCollege,
   AnswerSheetIntakeInput,
+  CollegeImportState,
   Exam,
   ExamInCharge,
   Evaluation,
@@ -36,14 +43,21 @@ import type {
   EvaluatorRegistrationInput,
   MarkingScheme,
   MockUser,
+  NodalCentre,
+  NodalCentreStatus,
   QuestionPaper,
   Student,
 } from "@/types/osm"
+import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 
 type OsmStoreState = {
   currentUser: MockUser | null
+  universityContext: typeof initialUniversityContext
+  affiliatedColleges: AffiliatedCollege[]
+  collegeImport: CollegeImportState
+  nodalCentres: NodalCentre[]
   students: Student[]
   exams: Exam[]
   questionPapers: QuestionPaper[]
@@ -62,6 +76,11 @@ type OsmStoreActions = {
   createAnswerSheet: (input: AnswerSheetIntakeInput) => AnswerSheet | undefined
   approveEvaluator: (evaluatorId: string) => boolean
   rejectEvaluator: (evaluatorId: string) => boolean
+  importAffiliatedColleges: () => CollegeImportState
+  updateNodalCentreStatus: (
+    nodalCentreId: string,
+    status: NodalCentreStatus
+  ) => boolean
   assignAnswerSheets: (
     input: AnswerSheetAssignmentInput
   ) => AnswerSheetAssignmentResult
@@ -133,6 +152,20 @@ function normalizeExamReferences<T extends { examId: string; subjectId: string }
 function cloneInitialState(): OsmStoreState {
   return {
     currentUser: null,
+    universityContext: {
+      ...initialUniversityContext,
+      affiliatedCollegeIds: [...initialUniversityContext.affiliatedCollegeIds],
+    },
+    affiliatedColleges: initialAffiliatedColleges.map((college) => ({ ...college })),
+    collegeImport: {
+      status: "ready",
+      importedCount: 0,
+      validationIssues: [],
+    },
+    nodalCentres: initialNodalCentres.map((nodalCentre) => ({
+      ...nodalCentre,
+      superintendent: { ...nodalCentre.superintendent },
+    })),
     students: initialStudents.map((student) => ({ ...student })),
     exams: initialExams.map((exam) => ({ ...exam })),
     questionPapers: initialQuestionPapers.map((questionPaper) => ({
@@ -304,6 +337,53 @@ export const useOsmStore = create<OsmStore>()(
 
         return true
       },
+      importAffiliatedColleges: () => {
+        const importedIds = new Set(get().affiliatedColleges.map((college) => college.id))
+        const newColleges = mockImportedColleges.filter(
+          (college) => !importedIds.has(college.id)
+        )
+        const processedAt = new Date().toISOString()
+        const nextState: CollegeImportState = {
+          status: "imported",
+          importedCount: newColleges.length,
+          validationIssues: [],
+          processedAt,
+        }
+
+        set((state) => ({
+          affiliatedColleges: [
+            ...state.affiliatedColleges,
+            ...newColleges.map((college) => ({ ...college, importedAt: processedAt })),
+          ],
+          universityContext: {
+            ...state.universityContext,
+            affiliatedCollegeIds: [
+              ...state.universityContext.affiliatedCollegeIds,
+              ...newColleges.map((college) => college.id),
+            ],
+          },
+          collegeImport: nextState,
+        }))
+
+        return nextState
+      },
+      updateNodalCentreStatus: (nodalCentreId, status) => {
+        const nodalCentre = get().nodalCentres.find(
+          (item) => item.id === nodalCentreId
+        )
+
+        if (!nodalCentre || nodalCentre.status === status) {
+          return false
+        }
+
+        set((state) => ({
+          nodalCentres: state.nodalCentres.map((item) =>
+            item.id === nodalCentreId ? { ...item, status } : item
+          ),
+        }))
+
+        return true
+      },
       assignAnswerSheets: (input) => {
         const validation = validateAssignment({
           input,
@@ -446,6 +526,10 @@ export const useOsmStore = create<OsmStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         currentUser: state.currentUser,
+        universityContext: state.universityContext,
+        affiliatedColleges: state.affiliatedColleges,
+        collegeImport: state.collegeImport,
+        nodalCentres: state.nodalCentres,
         students: state.students,
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,
