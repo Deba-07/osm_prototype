@@ -128,6 +128,39 @@ export type UploadBatchInput = {
   remarks?: string
 }
 
+export type PdfProcessingStatus =
+  | "received"
+  | "detecting_pages"
+  | "splitting_pages"
+  | "generating_scripts"
+  | "completed"
+  | "failed"
+
+export type PdfProcessingJob = {
+  id: string
+  uploadBatchId: string
+  status: PdfProcessingStatus
+  totalPages: number
+  detectedPages: number
+  processedPages: number
+  generatedScripts: number
+  progress: number
+  startedAt?: string
+  completedAt?: string
+  errorMessage?: string
+}
+
+export type ProcessedScript = {
+  id: string
+  uploadBatchId: string
+  pageCount: number
+  startPage: number
+  endPage: number
+  status: "generated"
+  coverPageProtected: boolean
+  generatedAt: string
+}
+
 export type Department = {
   id: string
   name: string

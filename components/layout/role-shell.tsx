@@ -14,6 +14,7 @@ import {
   MapPinned,
   UserRoundPlus,
   Files,
+  Workflow,
   ListChecks,
   School,
   Trophy,
@@ -67,6 +68,11 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/upload-batches",
     label: "Upload Batches",
     icon: Files,
+  },
+  {
+    href: "/admin/pdf-processing",
+    label: "PDF Processing",
+    icon: Workflow,
   },
   {
     href: "/admin/evaluators",

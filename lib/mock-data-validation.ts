@@ -3,6 +3,7 @@ import { affiliatedColleges } from "@/data/colleges"
 import { nodalCentres } from "@/data/nodal-centres"
 import { uploaders } from "@/data/uploaders"
 import { uploadBatches } from "@/data/upload-batches"
+import { pdfProcessingJobs } from "@/data/pdf-processing"
 import {
   examInCharges,
   exams,
@@ -187,6 +188,22 @@ export function validateMockDataRelationships(): MockDataValidationResult {
 
     if (!batch.rollSheet.fileName) {
       errors.push("Upload batch " + batch.id + " is missing a roll sheet.")
+    }
+  }
+
+  for (const job of pdfProcessingJobs) {
+    if (!batchIds.has(job.uploadBatchId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "PDF processing job",
+        entityId: job.id,
+        field: "upload batch",
+        referencedId: job.uploadBatchId,
+      })
+    }
+
+    if (job.status === "completed" && job.progress !== 100) {
+      errors.push("Completed PDF processing jobs must have 100% progress.")
     }
   }
 

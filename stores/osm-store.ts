@@ -5,6 +5,7 @@ import { initialEvaluations } from "@/data/evaluations"
 import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
 import { uploaders as initialUploaders } from "@/data/uploaders"
 import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
+import { pdfProcessingJobs as initialPdfProcessingJobs } from "@/data/pdf-processing"
 import {
   affiliatedColleges as initialAffiliatedColleges,
   mockImportedColleges,
@@ -37,6 +38,7 @@ import {
   getNextUploadBatchNumber,
   validateUploadBatchInput,
 } from "@/lib/upload-batches"
+import { canStartPdfProcessing } from "@/lib/pdf-processing"
 import type {
   AnswerSheet,
   AffiliatedCollege,
@@ -58,6 +60,8 @@ import type {
   UploaderRegistrationInput,
   UploadBatch,
   UploadBatchInput,
+  PdfProcessingJob,
+  ProcessedScript,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -71,6 +75,8 @@ type OsmStoreState = {
   nodalCentres: NodalCentre[]
   uploaders: Uploader[]
   uploadBatches: UploadBatch[]
+  pdfProcessingJobs: PdfProcessingJob[]
+  processedScripts: ProcessedScript[]
   students: Student[]
   exams: Exam[]
   questionPapers: QuestionPaper[]
@@ -98,6 +104,8 @@ type OsmStoreActions = {
   approveUploader: (uploaderId: string) => boolean
   rejectUploader: (uploaderId: string, reason?: string) => boolean
   createUploadBatch: (input: UploadBatchInput) => UploadBatch | undefined
+  startPdfProcessing: (uploadBatchId: string) => boolean
+  advancePdfProcessing: (uploadBatchId: string) => PdfProcessingJob | undefined
   assignAnswerSheets: (
     input: AnswerSheetAssignmentInput
   ) => AnswerSheetAssignmentResult
@@ -189,6 +197,8 @@ function cloneInitialState(): OsmStoreState {
       scannedPdf: { ...batch.scannedPdf },
       rollSheet: { ...batch.rollSheet },
     })),
+    pdfProcessingJobs: initialPdfProcessingJobs.map((job) => ({ ...job })),
+    processedScripts: [],
     students: initialStudents.map((student) => ({ ...student })),
     exams: initialExams.map((exam) => ({ ...exam })),
     questionPapers: initialQuestionPapers.map((questionPaper) => ({
@@ -494,6 +504,111 @@ export const useOsmStore = create<OsmStore>()(
 
         return uploadBatch
       },
+      startPdfProcessing: (uploadBatchId) => {
+        const batch = get().uploadBatches.find(
+          (item) => item.id === uploadBatchId
+        )
+        const existingJob = get().pdfProcessingJobs.find(
+          (item) => item.uploadBatchId === uploadBatchId
+        )
+        const validationError = canStartPdfProcessing({
+          batch,
+          job: existingJob,
+        })
+
+        if (validationError || existingJob?.status === "completed") {
+          return false
+        }
+
+        const nextJob: PdfProcessingJob = {
+          id: existingJob?.id ?? "pdf-job-" + uploadBatchId,
+          uploadBatchId,
+          status: "detecting_pages",
+          totalPages: 32,
+          detectedPages: 0,
+          processedPages: 0,
+          generatedScripts: 0,
+          progress: 20,
+          startedAt: existingJob?.startedAt ?? new Date().toISOString(),
+        }
+
+        set((state) => ({
+          pdfProcessingJobs: existingJob
+            ? state.pdfProcessingJobs.map((job) =>
+                job.uploadBatchId === uploadBatchId ? nextJob : job
+              )
+            : [...state.pdfProcessingJobs, nextJob],
+        }))
+
+        return true
+      },
+      advancePdfProcessing: (uploadBatchId) => {
+        const job = get().pdfProcessingJobs.find(
+          (item) => item.uploadBatchId === uploadBatchId
+        )
+
+        if (!job || job.status === "received" || job.status === "completed") {
+          return job
+        }
+
+        let nextJob: PdfProcessingJob
+        let generatedScript: ProcessedScript | undefined
+
+        if (job.status === "detecting_pages") {
+          nextJob = {
+            ...job,
+            status: "splitting_pages",
+            detectedPages: 32,
+            progress: 40,
+          }
+        } else if (job.status === "splitting_pages") {
+          nextJob = {
+            ...job,
+            status: "generating_scripts",
+            detectedPages: 32,
+            processedPages: 32,
+            progress: 80,
+          }
+        } else {
+          const completedAt = new Date().toISOString()
+          nextJob = {
+            ...job,
+            status: "completed",
+            totalPages: 32,
+            detectedPages: 32,
+            processedPages: 32,
+            generatedScripts: 1,
+            progress: 100,
+            completedAt,
+          }
+          generatedScript = {
+            id: "script-" + uploadBatchId + "-001",
+            uploadBatchId,
+            pageCount: 32,
+            startPage: 1,
+            endPage: 32,
+            status: "generated",
+            coverPageProtected: true,
+            generatedAt: completedAt,
+          }
+        }
+
+        set((state) => ({
+          pdfProcessingJobs: state.pdfProcessingJobs.map((item) =>
+            item.uploadBatchId === uploadBatchId ? nextJob : item
+          ),
+          processedScripts: generatedScript
+            ? [
+                ...state.processedScripts.filter(
+                  (script) => script.uploadBatchId !== uploadBatchId
+                ),
+                generatedScript,
+              ]
+            : state.processedScripts,
+        }))
+
+        return nextJob
+      },
       assignAnswerSheets: (input) => {
         const validation = validateAssignment({
           input,
@@ -642,6 +757,8 @@ export const useOsmStore = create<OsmStore>()(
         nodalCentres: state.nodalCentres,
         uploaders: state.uploaders,
         uploadBatches: state.uploadBatches,
+        pdfProcessingJobs: state.pdfProcessingJobs,
+        processedScripts: state.processedScripts,
         students: state.students,
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,
