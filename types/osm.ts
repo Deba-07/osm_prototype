@@ -59,11 +59,51 @@ export type Evaluator = {
   status: EvaluatorStatus
 }
 
+export type ExamPaperType = "regular" | "midterm" | "supplementary"
+
+export type ExamStatus = "draft" | "ready" | "scheduled" | "completed"
+
+export type ExamDocumentStatus = "draft" | "approved" | "published"
+
+export type QuestionPaper = {
+  id: string
+  title: string
+  fileName: string
+  uploadedAt: string
+  status: ExamDocumentStatus
+}
+
+export type MarkingScheme = {
+  id: string
+  title: string
+  totalMarks: number
+  passingMarks: number
+  version: string
+  uploadedAt: string
+  status: ExamDocumentStatus
+}
+
+export type ExamInCharge = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  departmentId: string
+  designation: string
+}
+
 export type Exam = {
   id: string
   name: string
   academicYear: string
   semesterId: string
+  subjectId: string
+  paperType: ExamPaperType
+  examDate: string
+  questionPaperId: string
+  markingSchemeId: string
+  examInChargeId: string
+  status: ExamStatus
 }
 
 export type ExamQuestion = {

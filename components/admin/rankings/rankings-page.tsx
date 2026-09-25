@@ -134,7 +134,11 @@ function getActiveExamId({
     (subject) => subject.id === activeSubjectId
   )
   const eligibleExams = selectedSubject
-    ? exams.filter((exam) => exam.semesterId === selectedSubject.semesterId)
+    ? exams.filter(
+        (exam) =>
+          exam.semesterId === selectedSubject.semesterId &&
+          exam.subjectId === selectedSubject.id
+      )
     : exams
 
   if (

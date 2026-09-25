@@ -226,7 +226,8 @@ export function getEligibleUnassignedSheets({
     !exam ||
     subject.departmentId !== departmentId ||
     subject.semesterId !== semesterId ||
-    exam.semesterId !== semesterId
+    exam.semesterId !== semesterId ||
+    exam.subjectId !== subjectId
   ) {
     return []
   }
@@ -311,6 +312,10 @@ export function validateAssignment({
 
   if (subject && exam && subject.semesterId !== exam.semesterId) {
     fieldErrors.examId = "Select an exam for the selected subject semester."
+  }
+
+  if (subject && exam && exam.subjectId !== subject.id) {
+    fieldErrors.examId = "Select an exam configured for the selected subject."
   }
 
   if (

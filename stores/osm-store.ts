@@ -3,7 +3,12 @@
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
 import { evaluators as initialEvaluators } from "@/data/evaluators"
-import { exams } from "@/data/exams"
+import {
+  examInCharges as initialExamInCharges,
+  exams as initialExams,
+  markingSchemes as initialMarkingSchemes,
+  questionPapers as initialQuestionPapers,
+} from "@/data/exams"
 import { departments } from "@/data/departments"
 import { programs } from "@/data/programs"
 import { examQuestions } from "@/data/questions"
@@ -23,11 +28,15 @@ import {
 import type {
   AnswerSheet,
   AnswerSheetIntakeInput,
+  Exam,
+  ExamInCharge,
   Evaluation,
   EvaluationDraftInput,
   Evaluator,
   EvaluatorRegistrationInput,
+  MarkingScheme,
   MockUser,
+  QuestionPaper,
   Student,
 } from "@/types/osm"
 import { create } from "zustand"
@@ -36,6 +45,10 @@ import { createJSONStorage, persist } from "zustand/middleware"
 type OsmStoreState = {
   currentUser: MockUser | null
   students: Student[]
+  exams: Exam[]
+  questionPapers: QuestionPaper[]
+  markingSchemes: MarkingScheme[]
+  examInCharges: ExamInCharge[]
   evaluators: Evaluator[]
   answerSheets: AnswerSheet[]
   evaluations: Evaluation[]
@@ -76,10 +89,61 @@ function createDemoId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+const currentExamIds = new Set(initialExams.map((exam) => exam.id))
+
+const legacyExamIdsBySubject = new Map([
+  ["exam-2026-sem2-regular:sub-ece-circuits", "exam-2026-sem2-ec102-regular"],
+  ["exam-2026-sem2-regular:sub-me-materials", "exam-2026-sem2-me102-regular"],
+  ["exam-2026-sem3-midterm:sub-cse-dsa", "exam-2026-sem3-cs203-midterm"],
+  ["exam-2026-sem3-midterm:sub-ece-signals", "exam-2026-sem3-ec203-midterm"],
+  ["exam-2026-sem3-midterm:sub-me-thermo", "exam-2026-sem3-me203-midterm"],
+  ["exam-2026-sem4-regular:sub-cse-dbms", "exam-2026-sem4-cs204-regular"],
+  ["exam-2026-sem4-regular:sub-cse-os", "exam-2026-sem4-cs206-regular"],
+  ["exam-2026-sem4-regular:sub-ece-digital", "exam-2026-sem4-ec204-regular"],
+  ["exam-2026-sem4-regular:sub-me-fluids", "exam-2026-sem4-me204-regular"],
+])
+
+function resolveCurrentExamId({
+  examId,
+  subjectId,
+}: {
+  examId: string
+  subjectId: string
+}) {
+  if (currentExamIds.has(examId)) {
+    return examId
+  }
+
+  return legacyExamIdsBySubject.get(`${examId}:${subjectId}`) ?? examId
+}
+
+function normalizeExamReferences<T extends { examId: string; subjectId: string }>(
+  records: T[]
+): T[] {
+  return records.map((record) => {
+    const examId = resolveCurrentExamId({
+      examId: record.examId,
+      subjectId: record.subjectId,
+    })
+
+    return examId === record.examId ? record : { ...record, examId }
+  })
+}
+
 function cloneInitialState(): OsmStoreState {
   return {
     currentUser: null,
     students: initialStudents.map((student) => ({ ...student })),
+    exams: initialExams.map((exam) => ({ ...exam })),
+    questionPapers: initialQuestionPapers.map((questionPaper) => ({
+      ...questionPaper,
+    })),
+    markingSchemes: initialMarkingSchemes.map((markingScheme) => ({
+      ...markingScheme,
+    })),
+    examInCharges: initialExamInCharges.map((examInCharge) => ({
+      ...examInCharge,
+    })),
     evaluators: initialEvaluators.map((evaluator) => ({
       ...evaluator,
       subjectExpertise: [...evaluator.subjectExpertise],
@@ -177,7 +241,7 @@ export const useOsmStore = create<OsmStore>()(
           students: get().students,
           subjects,
           semesters,
-          exams,
+          exams: get().exams,
         })
 
         if (!validation.success) {
@@ -249,7 +313,7 @@ export const useOsmStore = create<OsmStore>()(
           programs,
           semesters,
           subjects,
-          exams,
+          exams: get().exams,
           evaluators: get().evaluators,
         })
 
@@ -387,6 +451,24 @@ export const useOsmStore = create<OsmStore>()(
         answerSheets: state.answerSheets,
         evaluations: state.evaluations,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<OsmStoreState> | undefined
+
+        return {
+          ...currentState,
+          ...persisted,
+          exams: currentState.exams,
+          questionPapers: currentState.questionPapers,
+          markingSchemes: currentState.markingSchemes,
+          examInCharges: currentState.examInCharges,
+          answerSheets: persisted?.answerSheets
+            ? normalizeExamReferences(persisted.answerSheets)
+            : currentState.answerSheets,
+          evaluations: persisted?.evaluations
+            ? normalizeExamReferences(persisted.evaluations)
+            : currentState.evaluations,
+        }
+      },
       version: 1,
     }
   )

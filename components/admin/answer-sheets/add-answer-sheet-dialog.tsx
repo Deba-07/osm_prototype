@@ -110,6 +110,7 @@ export function AddAnswerSheetDialog({
   })
   const selectedStudentId = useWatch({ control, name: "studentId" })
   const selectedSemesterId = useWatch({ control, name: "semesterId" })
+  const selectedSubjectId = useWatch({ control, name: "subjectId" })
   const selectedStudent = useMemo(
     () => findById(students, selectedStudentId),
     [selectedStudentId, students]
@@ -133,9 +134,10 @@ export function AddAnswerSheetDialog({
     () =>
       getCompatibleExamsForIntake({
         semesterId: selectedSemesterId,
+        subjectId: selectedSubjectId,
         exams,
       }),
-    [exams, selectedSemesterId]
+    [exams, selectedSemesterId, selectedSubjectId]
   )
   const rootError = errors.root?.message
 
@@ -162,6 +164,13 @@ export function AddAnswerSheetDialog({
 
   function handleSemesterChange() {
     resetDependentAcademicFields()
+  }
+
+  function handleSubjectChange() {
+    setValue("examId", "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -345,11 +354,18 @@ export function AddAnswerSheetDialog({
                   )}
                   aria-invalid={Boolean(errors.examId)}
                   aria-describedby={errors.examId ? "examId-error" : undefined}
-                  disabled={selectedSemesterId.length === 0}
+                  disabled={
+                    selectedSemesterId.length === 0 ||
+                    selectedSubjectId.length === 0
+                  }
                   {...register("examId")}
                 >
                   <option value="">
-                    {selectedSemesterId ? "Select exam" : "Select semester first"}
+                    {selectedSemesterId
+                      ? selectedSubjectId
+                        ? "Select exam"
+                        : "Select subject first"
+                      : "Select semester first"}
                   </option>
                   {compatibleExams.map((exam) => (
                     <option key={exam.id} value={exam.id}>
@@ -374,7 +390,9 @@ export function AddAnswerSheetDialog({
                     errors.subjectId ? "subjectId-error" : undefined
                   }
                   disabled={!selectedStudent || selectedSemesterId.length === 0}
-                  {...register("subjectId")}
+                  {...register("subjectId", {
+                    onChange: handleSubjectChange,
+                  })}
                 >
                   <option value="">
                     {!selectedStudent

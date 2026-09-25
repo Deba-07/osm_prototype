@@ -51,12 +51,16 @@ export function AnswerSheetFilters({
   )
   const filteredExams = useMemo(
     () =>
-      exams.filter(
-        (exam) =>
+      exams.filter((exam) => {
+        const matchesSemester =
           filters.semesterId.length === 0 ||
           exam.semesterId === filters.semesterId
-      ),
-    [exams, filters.semesterId]
+        const matchesSubject =
+          filters.subjectId.length === 0 || exam.subjectId === filters.subjectId
+
+        return matchesSemester && matchesSubject
+      }),
+    [exams, filters.semesterId, filters.subjectId]
   )
 
   function setFilter<Key extends keyof AnswerSheetFilterState>(
@@ -82,6 +86,14 @@ export function AnswerSheetFilters({
       ...filters,
       semesterId: value,
       subjectId: "",
+      examId: "",
+    })
+  }
+
+  function handleSubjectChange(value: string) {
+    onFiltersChange({
+      ...filters,
+      subjectId: value,
       examId: "",
     })
   }
@@ -171,7 +183,7 @@ export function AnswerSheetFilters({
             id="answer-sheet-subject"
             className={selectClassName}
             value={filters.subjectId}
-            onChange={(event) => setFilter("subjectId", event.target.value)}
+            onChange={(event) => handleSubjectChange(event.target.value)}
           >
             <option value="">All subjects</option>
             {filteredSubjects.map((subject) => (

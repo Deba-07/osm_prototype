@@ -13,6 +13,7 @@ import type {
   Subject,
 } from "@/types/osm"
 import { RotateCcw, Search } from "lucide-react"
+import { useMemo } from "react"
 
 type ResultFiltersProps = {
   filters: ResultFilterState
@@ -52,6 +53,36 @@ export function ResultFilters({
   onFiltersChange,
   onReset,
 }: ResultFiltersProps) {
+  const filteredExams = useMemo(
+    () =>
+      exams.filter((exam) => {
+        const matchesSemester =
+          filters.semesterId.length === 0 ||
+          exam.semesterId === filters.semesterId
+        const matchesSubject =
+          filters.subjectId.length === 0 || exam.subjectId === filters.subjectId
+
+        return matchesSemester && matchesSubject
+      }),
+    [exams, filters.semesterId, filters.subjectId]
+  )
+
+  function handleSemesterChange(value: string) {
+    onFiltersChange({
+      ...filters,
+      semesterId: value,
+      examId: "",
+    })
+  }
+
+  function handleSubjectChange(value: string) {
+    onFiltersChange({
+      ...filters,
+      subjectId: value,
+      examId: "",
+    })
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 lg:grid-cols-[minmax(240px,1.4fr)_repeat(5,minmax(150px,1fr))]">
@@ -124,11 +155,7 @@ export function ResultFilters({
             id="result-semester"
             className={selectClassName()}
             value={filters.semesterId}
-            onChange={(event) =>
-              onFiltersChange(
-                updateFilter(filters, "semesterId", event.target.value)
-              )
-            }
+            onChange={(event) => handleSemesterChange(event.target.value)}
           >
             <option value="">All semesters</option>
             {semesters.map((semester) => (
@@ -145,11 +172,7 @@ export function ResultFilters({
             id="result-subject"
             className={selectClassName()}
             value={filters.subjectId}
-            onChange={(event) =>
-              onFiltersChange(
-                updateFilter(filters, "subjectId", event.target.value)
-              )
-            }
+            onChange={(event) => handleSubjectChange(event.target.value)}
           >
             <option value="">All subjects</option>
             {subjects.map((subject) => (
@@ -171,7 +194,7 @@ export function ResultFilters({
             }
           >
             <option value="">All exams</option>
-            {exams.map((exam) => (
+            {filteredExams.map((exam) => (
               <option key={exam.id} value={exam.id}>
                 {exam.name}
               </option>
