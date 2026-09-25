@@ -3,6 +3,8 @@
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
 import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
+import { uploaders as initialUploaders } from "@/data/uploaders"
+import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
 import {
   affiliatedColleges as initialAffiliatedColleges,
   mockImportedColleges,
@@ -30,6 +32,11 @@ import {
   validateEvaluationDraftInput,
   validateEvaluationSubmissionInput,
 } from "@/lib/evaluations"
+import { validateUploaderRegistration } from "@/lib/uploaders"
+import {
+  getNextUploadBatchNumber,
+  validateUploadBatchInput,
+} from "@/lib/upload-batches"
 import type {
   AnswerSheet,
   AffiliatedCollege,
@@ -47,6 +54,10 @@ import type {
   NodalCentreStatus,
   QuestionPaper,
   Student,
+  Uploader,
+  UploaderRegistrationInput,
+  UploadBatch,
+  UploadBatchInput,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -58,6 +69,8 @@ type OsmStoreState = {
   affiliatedColleges: AffiliatedCollege[]
   collegeImport: CollegeImportState
   nodalCentres: NodalCentre[]
+  uploaders: Uploader[]
+  uploadBatches: UploadBatch[]
   students: Student[]
   exams: Exam[]
   questionPapers: QuestionPaper[]
@@ -81,6 +94,10 @@ type OsmStoreActions = {
     nodalCentreId: string,
     status: NodalCentreStatus
   ) => boolean
+  registerUploader: (input: UploaderRegistrationInput) => Uploader | undefined
+  approveUploader: (uploaderId: string) => boolean
+  rejectUploader: (uploaderId: string, reason?: string) => boolean
+  createUploadBatch: (input: UploadBatchInput) => UploadBatch | undefined
   assignAnswerSheets: (
     input: AnswerSheetAssignmentInput
   ) => AnswerSheetAssignmentResult
@@ -165,6 +182,12 @@ function cloneInitialState(): OsmStoreState {
     nodalCentres: initialNodalCentres.map((nodalCentre) => ({
       ...nodalCentre,
       superintendent: { ...nodalCentre.superintendent },
+    })),
+    uploaders: initialUploaders.map((uploader) => ({ ...uploader })),
+    uploadBatches: initialUploadBatches.map((batch) => ({
+      ...batch,
+      scannedPdf: { ...batch.scannedPdf },
+      rollSheet: { ...batch.rollSheet },
     })),
     students: initialStudents.map((student) => ({ ...student })),
     exams: initialExams.map((exam) => ({ ...exam })),
@@ -384,6 +407,93 @@ export const useOsmStore = create<OsmStore>()(
 
         return true
       },
+      registerUploader: (input) => {
+        const validationError = validateUploaderRegistration({
+          input,
+          uploaders: get().uploaders,
+          affiliatedColleges: get().affiliatedColleges,
+          nodalCentres: get().nodalCentres,
+        })
+
+        if (validationError) return undefined
+
+        const uploader: Uploader = {
+          ...input,
+          email: input.email.trim().toLowerCase(),
+          name: input.name.trim(),
+          id: createDemoId("uploader"),
+          status: "pending",
+          registeredAt: new Date().toISOString(),
+        }
+
+        set((state) => ({ uploaders: [uploader, ...state.uploaders] }))
+        return uploader
+      },
+      approveUploader: (uploaderId) => {
+        const uploader = get().uploaders.find((item) => item.id === uploaderId)
+        if (!uploader || uploader.status !== "pending") return false
+
+        set((state) => ({
+          uploaders: state.uploaders.map((item) =>
+            item.id === uploaderId
+              ? {
+                  ...item,
+                  status: "approved",
+                  approvedAt: new Date().toISOString(),
+                  rejectedAt: undefined,
+                  rejectionReason: undefined,
+                }
+              : item
+          ),
+        }))
+        return true
+      },
+      rejectUploader: (uploaderId, reason) => {
+        const uploader = get().uploaders.find((item) => item.id === uploaderId)
+        if (!uploader || uploader.status !== "pending") return false
+
+        set((state) => ({
+          uploaders: state.uploaders.map((item) =>
+            item.id === uploaderId
+              ? {
+                  ...item,
+                  status: "rejected",
+                  rejectedAt: new Date().toISOString(),
+                  rejectionReason: reason?.trim() || undefined,
+                  approvedAt: undefined,
+                }
+              : item
+          ),
+        }))
+        return true
+      },
+      createUploadBatch: (input) => {
+        const validationError = validateUploadBatchInput({
+          input,
+          exams: get().exams,
+          nodalCentres: get().nodalCentres,
+          uploaders: get().uploaders,
+        })
+
+        if (validationError) return undefined
+
+        const uploadedAt = new Date().toISOString()
+        const uploadBatch: UploadBatch = {
+          ...input,
+          id: createDemoId("batch"),
+          batchNumber: getNextUploadBatchNumber(get().uploadBatches),
+          status: "ready_for_processing",
+          uploadedAt,
+          scannedPdf: { ...input.scannedPdf },
+          rollSheet: { ...input.rollSheet },
+        }
+
+        set((state) => ({
+          uploadBatches: [uploadBatch, ...state.uploadBatches],
+        }))
+
+        return uploadBatch
+      },
       assignAnswerSheets: (input) => {
         const validation = validateAssignment({
           input,
@@ -530,6 +640,8 @@ export const useOsmStore = create<OsmStore>()(
         affiliatedColleges: state.affiliatedColleges,
         collegeImport: state.collegeImport,
         nodalCentres: state.nodalCentres,
+        uploaders: state.uploaders,
+        uploadBatches: state.uploadBatches,
         students: state.students,
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,

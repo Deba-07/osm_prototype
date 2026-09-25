@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   Building2,
   MapPinned,
+  UserRoundPlus,
+  Files,
   ListChecks,
   School,
   Trophy,
@@ -55,6 +57,16 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/nodal-centres",
     label: "Nodal Centres",
     icon: MapPinned,
+  },
+  {
+    href: "/admin/uploaders",
+    label: "Uploaders",
+    icon: UserRoundPlus,
+  },
+  {
+    href: "/admin/upload-batches",
+    label: "Upload Batches",
+    icon: Files,
   },
   {
     href: "/admin/evaluators",

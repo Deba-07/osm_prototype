@@ -61,6 +61,73 @@ export type NodalCentre = {
   createdAt: string
 }
 
+export type UploaderStatus = "pending" | "approved" | "rejected"
+
+export type Uploader = {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  collegeId: string
+  nodalCentreId: string
+  status: UploaderStatus
+  registeredAt: string
+  approvedAt?: string
+  rejectedAt?: string
+  rejectionReason?: string
+}
+
+export type UploaderRegistrationInput = Pick<
+  Uploader,
+  "name" | "email" | "collegeId" | "nodalCentreId"
+> & {
+  phone?: string
+}
+
+export type ScannedPdfMetadata = {
+  fileName: string
+  fileSize: number
+  fileType: string
+  uploadedAt: string
+  demoReference: string
+}
+
+export type RollSheetMetadata = {
+  fileName: string
+  fileSize: number
+  fileType: string
+  uploadedAt: string
+  demoReference: string
+}
+
+export type UploadBatchStatus =
+  | "draft"
+  | "uploaded"
+  | "ready_for_processing"
+  | "failed"
+
+export type UploadBatch = {
+  id: string
+  batchNumber: string
+  nodalCentreId: string
+  uploaderId: string
+  examId: string
+  scannedPdf: ScannedPdfMetadata
+  rollSheet: RollSheetMetadata
+  status: UploadBatchStatus
+  uploadedAt: string
+  remarks?: string
+}
+
+export type UploadBatchInput = {
+  nodalCentreId: string
+  uploaderId: string
+  examId: string
+  scannedPdf: ScannedPdfMetadata
+  rollSheet: RollSheetMetadata
+  remarks?: string
+}
+
 export type Department = {
   id: string
   name: string

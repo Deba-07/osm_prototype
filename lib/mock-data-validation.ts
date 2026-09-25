@@ -1,6 +1,8 @@
 import { answerSheets } from "@/data/answer-sheets"
 import { affiliatedColleges } from "@/data/colleges"
 import { nodalCentres } from "@/data/nodal-centres"
+import { uploaders } from "@/data/uploaders"
+import { uploadBatches } from "@/data/upload-batches"
 import {
   examInCharges,
   exams,
@@ -87,6 +89,104 @@ export function validateMockDataRelationships(): MockDataValidationResult {
       errors.push(
         `Nodal centre ${nodalCentre.id} crosses institutes between ${nodalCentre.instituteId} and ${college.instituteId}.`
       )
+    }
+  }
+
+  for (const uploader of uploaders) {
+    const college = affiliatedColleges.find((item) => item.id === uploader.collegeId)
+    const nodalCentre = nodalCentres.find((item) => item.id === uploader.nodalCentreId)
+
+    if (!college) {
+      addMissingReferenceError({
+        errors,
+        entity: "Uploader",
+        entityId: uploader.id,
+        field: "affiliated college",
+        referencedId: uploader.collegeId,
+      })
+    }
+
+    if (!nodalCentre) {
+      addMissingReferenceError({
+        errors,
+        entity: "Uploader",
+        entityId: uploader.id,
+        field: "nodal centre",
+        referencedId: uploader.nodalCentreId,
+      })
+    }
+
+    if (college && nodalCentre && nodalCentre.affiliatedCollegeId !== college.id) {
+      errors.push(
+        "Uploader " +
+          uploader.id +
+          " assigns nodal centre " +
+          nodalCentre.id +
+          " to the wrong affiliated college."
+      )
+    }
+  }
+
+  const batchIds = collectIds(uploadBatches)
+  if (batchIds.size !== uploadBatches.length) {
+    errors.push("Upload batches must have unique IDs.")
+  }
+
+  for (const batch of uploadBatches) {
+    const exam = exams.find((item) => item.id === batch.examId)
+    const nodalCentre = nodalCentres.find(
+      (item) => item.id === batch.nodalCentreId
+    )
+    const uploader = uploaders.find((item) => item.id === batch.uploaderId)
+
+    if (!exam) {
+      addMissingReferenceError({
+        errors,
+        entity: "Upload batch",
+        entityId: batch.id,
+        field: "exam",
+        referencedId: batch.examId,
+      })
+    }
+
+    if (!nodalCentre) {
+      addMissingReferenceError({
+        errors,
+        entity: "Upload batch",
+        entityId: batch.id,
+        field: "nodal centre",
+        referencedId: batch.nodalCentreId,
+      })
+    }
+
+    if (!uploader) {
+      addMissingReferenceError({
+        errors,
+        entity: "Upload batch",
+        entityId: batch.id,
+        field: "uploader",
+        referencedId: batch.uploaderId,
+      })
+    } else if (uploader.status !== "approved") {
+      errors.push("Upload batch " + batch.id + " uses a non-approved uploader.")
+    }
+
+    if (nodalCentre && uploader && uploader.nodalCentreId !== nodalCentre.id) {
+      errors.push(
+        "Upload batch " +
+          batch.id +
+          " assigns uploader " +
+          uploader.id +
+          " to an unrelated nodal centre."
+      )
+    }
+
+    if (!batch.scannedPdf.fileName.toLowerCase().endsWith(".pdf")) {
+      errors.push("Upload batch " + batch.id + " does not reference a PDF scan.")
+    }
+
+    if (!batch.rollSheet.fileName) {
+      errors.push("Upload batch " + batch.id + " is missing a roll sheet.")
     }
   }
 
