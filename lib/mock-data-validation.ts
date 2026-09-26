@@ -4,6 +4,8 @@ import { nodalCentres } from "@/data/nodal-centres"
 import { uploaders } from "@/data/uploaders"
 import { uploadBatches } from "@/data/upload-batches"
 import { pdfProcessingJobs } from "@/data/pdf-processing"
+import { processedScripts } from "@/data/processed-scripts"
+import { scriptMappings } from "@/data/script-mappings"
 import {
   examInCharges,
   exams,
@@ -15,6 +17,7 @@ import { examQuestions } from "@/data/questions"
 import { semesters } from "@/data/semesters"
 import { subjects } from "@/data/subjects"
 import { universityContext } from "@/data/university"
+import { students } from "@/data/students"
 import type { ExamPaperType } from "@/types/osm"
 
 export type MockDataValidationResult = {
@@ -204,6 +207,58 @@ export function validateMockDataRelationships(): MockDataValidationResult {
 
     if (job.status === "completed" && job.progress !== 100) {
       errors.push("Completed PDF processing jobs must have 100% progress.")
+    }
+  }
+
+  const scriptIds = collectIds(processedScripts)
+  const studentIds = collectIds(students)
+  for (const script of processedScripts) {
+    if (!batchIds.has(script.uploadBatchId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "Processed script",
+        entityId: script.id,
+        field: "upload batch",
+        referencedId: script.uploadBatchId,
+      })
+    }
+
+    if (
+      script.startPage < 1 ||
+      script.endPage < script.startPage ||
+      script.pageCount !== script.endPage - script.startPage + 1
+    ) {
+      errors.push(`Processed script ${script.id} has an invalid page range.`)
+    }
+  }
+
+  for (const mapping of scriptMappings) {
+    if (!scriptIds.has(mapping.scriptId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "Script mapping",
+        entityId: mapping.id,
+        field: "processed script",
+        referencedId: mapping.scriptId,
+      })
+    }
+
+    if (mapping.studentId && !studentIds.has(mapping.studentId)) {
+      addMissingReferenceError({
+        errors,
+        entity: "Script mapping",
+        entityId: mapping.id,
+        field: "student",
+        referencedId: mapping.studentId,
+      })
+    }
+
+    if (
+      mapping.startPage < 1 ||
+      mapping.endPage < mapping.startPage ||
+      mapping.pageCount !== mapping.endPage - mapping.startPage + 1
+    ) {
+      errors.push(`Script mapping ${mapping.id} has an invalid page range.`)
     }
   }
 

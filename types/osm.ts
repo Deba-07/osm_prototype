@@ -161,6 +161,31 @@ export type ProcessedScript = {
   generatedAt: string
 }
 
+export type ScriptMappingStatus = "valid" | "review" | "invalid"
+
+export type ScriptMapping = {
+  id: string
+  scriptId: string
+  studentId?: string
+  rollNumber?: string
+  startPage: number
+  endPage: number
+  pageCount: number
+  status: ScriptMappingStatus
+  validationIssues: string[]
+  reviewed: boolean
+  reviewedAt?: string
+  reviewNotes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ScriptMappingInput = {
+  scriptId: string
+  studentId?: string
+  rollNumber?: string
+}
+
 export type Department = {
   id: string
   name: string

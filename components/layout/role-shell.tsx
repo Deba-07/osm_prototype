@@ -15,6 +15,7 @@ import {
   UserRoundPlus,
   Files,
   Workflow,
+  GitBranch,
   ListChecks,
   School,
   Trophy,
@@ -73,6 +74,11 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/pdf-processing",
     label: "PDF Processing",
     icon: Workflow,
+  },
+  {
+    href: "/admin/script-mappings",
+    label: "Script Mappings",
+    icon: GitBranch,
   },
   {
     href: "/admin/evaluators",

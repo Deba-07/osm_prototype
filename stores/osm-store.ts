@@ -6,6 +6,8 @@ import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
 import { uploaders as initialUploaders } from "@/data/uploaders"
 import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
 import { pdfProcessingJobs as initialPdfProcessingJobs } from "@/data/pdf-processing"
+import { processedScripts as initialProcessedScripts } from "@/data/processed-scripts"
+import { scriptMappings as initialScriptMappings } from "@/data/script-mappings"
 import {
   affiliatedColleges as initialAffiliatedColleges,
   mockImportedColleges,
@@ -39,6 +41,7 @@ import {
   validateUploadBatchInput,
 } from "@/lib/upload-batches"
 import { canStartPdfProcessing } from "@/lib/pdf-processing"
+import { validateScriptMapping } from "@/lib/script-mappings"
 import type {
   AnswerSheet,
   AffiliatedCollege,
@@ -62,6 +65,8 @@ import type {
   UploadBatchInput,
   PdfProcessingJob,
   ProcessedScript,
+  ScriptMapping,
+  ScriptMappingInput,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -77,6 +82,7 @@ type OsmStoreState = {
   uploadBatches: UploadBatch[]
   pdfProcessingJobs: PdfProcessingJob[]
   processedScripts: ProcessedScript[]
+  scriptMappings: ScriptMapping[]
   students: Student[]
   exams: Exam[]
   questionPapers: QuestionPaper[]
@@ -106,6 +112,9 @@ type OsmStoreActions = {
   createUploadBatch: (input: UploadBatchInput) => UploadBatch | undefined
   startPdfProcessing: (uploadBatchId: string) => boolean
   advancePdfProcessing: (uploadBatchId: string) => PdfProcessingJob | undefined
+  createScriptMapping: (input: ScriptMappingInput) => ScriptMapping | undefined
+  correctScriptMapping: (mappingId: string, studentId: string) => boolean
+  reviewScriptMapping: (mappingId: string, notes?: string) => boolean
   assignAnswerSheets: (
     input: AnswerSheetAssignmentInput
   ) => AnswerSheetAssignmentResult
@@ -198,7 +207,11 @@ function cloneInitialState(): OsmStoreState {
       rollSheet: { ...batch.rollSheet },
     })),
     pdfProcessingJobs: initialPdfProcessingJobs.map((job) => ({ ...job })),
-    processedScripts: [],
+    processedScripts: initialProcessedScripts.map((script) => ({ ...script })),
+    scriptMappings: initialScriptMappings.map((mapping) => ({
+      ...mapping,
+      validationIssues: [...mapping.validationIssues],
+    })),
     students: initialStudents.map((student) => ({ ...student })),
     exams: initialExams.map((exam) => ({ ...exam })),
     questionPapers: initialQuestionPapers.map((questionPaper) => ({
@@ -609,6 +622,101 @@ export const useOsmStore = create<OsmStore>()(
 
         return nextJob
       },
+      createScriptMapping: (input) => {
+        const validation = validateScriptMapping({
+          input,
+          scripts: get().processedScripts,
+          students: get().students,
+          batches: get().uploadBatches,
+          exams: get().exams,
+          mappings: get().scriptMappings,
+        })
+
+        if (!validation.script) return undefined
+
+        const now = new Date().toISOString()
+        const mapping: ScriptMapping = {
+          id: createDemoId("mapping"),
+          scriptId: validation.script.id,
+          studentId: input.studentId,
+          rollNumber: input.rollNumber?.trim() || undefined,
+          startPage: validation.script.startPage,
+          endPage: validation.script.endPage,
+          pageCount: validation.script.pageCount,
+          status: validation.status,
+          validationIssues: validation.issues,
+          reviewed: false,
+          createdAt: now,
+          updatedAt: now,
+        }
+
+        set((state) => ({ scriptMappings: [mapping, ...state.scriptMappings] }))
+        return mapping
+      },
+      correctScriptMapping: (mappingId, studentId) => {
+        const mapping = get().scriptMappings.find((item) => item.id === mappingId)
+        const student = get().students.find((item) => item.id === studentId)
+        if (!mapping || !student) return false
+
+        const candidate = {
+          ...mapping,
+          studentId: student.id,
+          rollNumber: student.rollNumber,
+        }
+        const validation = validateScriptMapping({
+          mapping: candidate,
+          input: {
+            scriptId: candidate.scriptId,
+            studentId: candidate.studentId,
+            rollNumber: candidate.rollNumber,
+          },
+          scripts: get().processedScripts,
+          students: get().students,
+          batches: get().uploadBatches,
+          exams: get().exams,
+          mappings: get().scriptMappings,
+        })
+
+        set((state) => ({
+          scriptMappings: state.scriptMappings.map((item) =>
+            item.id === mappingId
+              ? {
+                  ...item,
+                  studentId: student.id,
+                  rollNumber: student.rollNumber,
+                  status: validation.status,
+                  validationIssues: validation.issues,
+                  reviewed: false,
+                  reviewedAt: undefined,
+                  reviewNotes: undefined,
+                  updatedAt: new Date().toISOString(),
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
+      reviewScriptMapping: (mappingId, notes) => {
+        const mapping = get().scriptMappings.find((item) => item.id === mappingId)
+        if (!mapping) return false
+
+        set((state) => ({
+          scriptMappings: state.scriptMappings.map((item) =>
+            item.id === mappingId
+              ? {
+                  ...item,
+                  reviewed: true,
+                  reviewedAt: new Date().toISOString(),
+                  reviewNotes: notes?.trim() || item.reviewNotes,
+                  updatedAt: new Date().toISOString(),
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
       assignAnswerSheets: (input) => {
         const validation = validateAssignment({
           input,
@@ -759,6 +867,7 @@ export const useOsmStore = create<OsmStore>()(
         uploadBatches: state.uploadBatches,
         pdfProcessingJobs: state.pdfProcessingJobs,
         processedScripts: state.processedScripts,
+        scriptMappings: state.scriptMappings,
         students: state.students,
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,
