@@ -33,7 +33,10 @@ function getRoleLabel(currentUser: MockUser | null) {
     return "No active session"
   }
 
-  return currentUser.role === "admin" ? "University Admin" : "Evaluator"
+  if (currentUser.role === "admin") return "University Admin"
+  if (currentUser.role === "evaluator") return "Evaluator"
+  if (currentUser.role === "nodal_centre_uploader") return "Nodal Centre Uploader"
+  return "Centre Superintendent"
 }
 
 export function DemoSessionControls({

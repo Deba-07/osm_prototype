@@ -140,6 +140,8 @@ type OsmStoreState = {
 type OsmStoreActions = {
   loginAsAdmin: () => void
   loginAsEvaluator: (evaluatorId: string) => boolean
+  loginAsUploader: (uploaderId: string) => boolean
+  loginAsSuperintendent: (nodalCentreId: string) => boolean
   requestDemoOtp: (identifier: string) => DemoOtpRequestResult
   verifyDemoOtp: (code: string) => DemoOtpVerificationResult
   verifyEvaluatorSession: (evaluatorId?: string) => boolean
@@ -388,7 +390,6 @@ export const useOsmStore = create<OsmStore>()(
         set({
           currentUser: demoAdminUser,
           demoOtpChallenge: null,
-          evaluatorSession: null,
         })
       },
       addAuditLog: ({ action, entityType, entityId, examId, scriptId, description, metadata, dedupeWindowMs = 0 }) => {
@@ -419,9 +420,20 @@ export const useOsmStore = create<OsmStore>()(
             departmentId: evaluator.departmentId,
           },
           demoOtpChallenge: null,
-          evaluatorSession: null,
         })
 
+        return true
+      },
+      loginAsUploader: (uploaderId) => {
+        const uploader = get().uploaders.find((item) => item.id === uploaderId && item.status === "approved")
+        if (!uploader) return false
+        set({ currentUser: { id: `demo-user-${uploader.id}`, role: "nodal_centre_uploader", name: uploader.name, email: uploader.email, uploaderId: uploader.id, nodalCentreId: uploader.nodalCentreId }, demoOtpChallenge: null })
+        return true
+      },
+      loginAsSuperintendent: (nodalCentreId) => {
+        const centre = get().nodalCentres.find((item) => item.id === nodalCentreId)
+        if (!centre) return false
+        set({ currentUser: { id: `demo-superintendent-${centre.id}`, role: "centre_superintendent", name: centre.superintendent.name, email: centre.superintendent.email, nodalCentreId: centre.id }, demoOtpChallenge: null })
         return true
       },
       requestDemoOtp: (identifier) => {
@@ -465,7 +477,6 @@ export const useOsmStore = create<OsmStore>()(
             departmentId: evaluator.departmentId,
           },
           demoOtpChallenge: challenge,
-          evaluatorSession: null,
         })
 
         return { success: true, challenge }
@@ -776,6 +787,8 @@ export const useOsmStore = create<OsmStore>()(
         return true
       },
       createUploadBatch: (input) => {
+        const currentUser = get().currentUser
+        if (currentUser?.role === "nodal_centre_uploader" && (input.uploaderId !== currentUser.uploaderId || input.nodalCentreId !== currentUser.nodalCentreId)) return undefined
         const validationError = validateUploadBatchInput({
           input,
           exams: get().exams,

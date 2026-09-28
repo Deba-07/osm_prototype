@@ -11,8 +11,7 @@ import { useOsmStoreHydrated } from "@/hooks/use-osm-store-hydrated"
 import { cn } from "@/lib/utils"
 import { useOsmStore } from "@/stores/osm-store"
 import type { UploadBatch, UploadBatchStatus } from "@/types/osm"
-import { Eye, FileStack, Search } from "lucide-react"
-import Link from "next/link"
+import { Eye, Search } from "lucide-react"
 import { useMemo, useState } from "react"
 
 type StatusFilter = "all" | UploadBatchStatus
@@ -82,7 +81,7 @@ export function UploadBatchesPage() {
   ]
 
   return <div className="space-y-6">
-    <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div className="max-w-3xl space-y-2"><p className="text-sm font-medium text-muted-foreground">University Admin</p><h1 className="text-2xl font-semibold tracking-normal md:text-3xl">Upload Batch Intake</h1><p className="text-sm leading-6 text-muted-foreground">Review scanned answer-sheet and roll-sheet intake metadata before the later processing workflow begins.</p></div><Button variant="outline" render={<Link href="/uploader/upload-batches" />}><FileStack data-icon="inline-start" className="size-4" />Open Uploader Intake</Button></section>
+    <section className="space-y-2"><div className="max-w-3xl"><p className="text-sm font-medium text-muted-foreground">University Admin</p><h1 className="text-2xl font-semibold tracking-normal md:text-3xl">Upload Batch Intake</h1><p className="text-sm leading-6 text-muted-foreground">Review scanned answer-sheet and roll-sheet intake metadata before the later processing workflow begins.</p></div></section>
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Upload batch summary">{statCards.map((stat) => <Card key={stat.label} size="sm"><CardContent className="space-y-2"><p className="text-sm text-muted-foreground">{stat.label}</p><p className={cn("text-3xl font-semibold", stat.tone)}>{stat.value}</p></CardContent></Card>)}</section>
     <Card><CardHeader><CardTitle>Upload batches</CardTitle><CardDescription>Each batch joins an approved uploader, nodal centre, exam, scanned PDF metadata, and roll-sheet metadata.</CardDescription></CardHeader><CardContent className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_220px]"><div className="space-y-2"><Label htmlFor="batch-search">Search batches</Label><div className="relative"><Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input id="batch-search" className="pl-8" placeholder="Batch, exam, centre, uploader" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} /></div></div><div className="space-y-2"><Label htmlFor="batch-status">Status</Label><select id="batch-status" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="uploaded">Uploaded</option><option value="ready_for_processing">Ready for processing</option><option value="failed">Failed</option></select></div></div>

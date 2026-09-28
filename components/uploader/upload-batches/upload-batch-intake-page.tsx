@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { EvaluatorAccessState } from "@/components/evaluator/evaluator-access-state"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -51,9 +52,10 @@ export function UploadBatchIntakePage() {
   const exams = useOsmStore((state) => state.exams)
   const nodalCentres = useOsmStore((state) => state.nodalCentres)
   const uploaders = useOsmStore((state) => state.uploaders)
+  const currentUser = useOsmStore((state) => state.currentUser)
   const createUploadBatch = useOsmStore((state) => state.createUploadBatch)
-  const approvedUploaders = useMemo(() => uploaders.filter((uploader) => uploader.status === "approved"), [uploaders])
-  const [uploaderId, setUploaderId] = useState("")
+  const approvedUploaders = useMemo(() => uploaders.filter((uploader) => uploader.status === "approved" && (currentUser?.role !== "nodal_centre_uploader" || uploader.id === currentUser.uploaderId)), [currentUser, uploaders])
+  const [uploaderId, setUploaderId] = useState(currentUser?.uploaderId ?? "")
   const [examId, setExamId] = useState("")
   const [scannedPdf, setScannedPdf] = useState<ScannedPdfMetadata | undefined>()
   const [rollSheet, setRollSheet] = useState<RollSheetMetadata | undefined>()
@@ -66,7 +68,7 @@ export function UploadBatchIntakePage() {
   const selectedExam = exams.find((exam) => exam.id === examId)
 
   function resetForm() {
-    setUploaderId("")
+    setUploaderId(currentUser?.uploaderId ?? "")
     setExamId("")
     setScannedPdf(undefined)
     setRollSheet(undefined)
@@ -99,6 +101,7 @@ export function UploadBatchIntakePage() {
   }
 
   if (!hydrated) return <IntakeSkeleton />
+  if (currentUser?.role !== "nodal_centre_uploader") return <EvaluatorAccessState title="Uploader role required" description="This intake workflow is scoped to an approved nodal centre uploader." />
   if (submittedBatch) return <SubmittedBatch batch={submittedBatch} onCreateAnother={resetForm} />
 
   return <main className="min-h-screen bg-muted/25 px-4 py-8 md:py-10"><div className="mx-auto w-full max-w-4xl space-y-6"><div className="space-y-2"><Button variant="ghost" render={<Link href="/login" />}><ArrowLeft data-icon="inline-start" className="size-4" />Back to Login</Button><p className="text-sm font-medium text-muted-foreground">OSM · Approved uploader intake</p><h1 className="text-2xl font-semibold tracking-normal md:text-3xl">Create Upload Batch</h1><p className="max-w-3xl text-sm leading-6 text-muted-foreground">Submit scanned answer-sheet and roll-sheet metadata for an existing examination. No file contents are uploaded or processed in this demo.</p></div>

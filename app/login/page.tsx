@@ -12,8 +12,8 @@ export default function LoginPage() {
               Open OSM Demo
             </h1>
             <p className="text-sm leading-6 text-muted-foreground">
-              Choose University Admin or an approved evaluator. This prototype
-              uses mock role switching, not production authentication.
+              Choose a demo role. This prototype uses mock role switching, not
+              production authentication.
             </p>
           </div>
         </section>

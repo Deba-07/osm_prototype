@@ -504,7 +504,7 @@ export type EvaluatorRemuneration = {
   calculatedAt: string
 }
 
-export type MockUserRole = "admin" | "evaluator"
+export type MockUserRole = "admin" | "evaluator" | "nodal_centre_uploader" | "centre_superintendent"
 
 export type MockUser = {
   id: string
@@ -513,6 +513,8 @@ export type MockUser = {
   email: string
   evaluatorId?: string
   departmentId?: string
+  uploaderId?: string
+  nodalCentreId?: string
 }
 
 export type EvaluatorRegistrationInput = Omit<Evaluator, "id" | "status">

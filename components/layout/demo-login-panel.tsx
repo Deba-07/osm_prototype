@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useOsmStoreHydrated } from "@/hooks/use-osm-store-hydrated"
 import { cn } from "@/lib/utils"
 import { useOsmStore } from "@/stores/osm-store"
-import { ShieldCheck, UserCheck } from "lucide-react"
+import { Building2, ShieldCheck, UserCheck, UploadCloud } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -22,13 +22,20 @@ export function DemoLoginPanel() {
   const router = useRouter()
   const isHydrated = useOsmStoreHydrated()
   const loginAsAdmin = useOsmStore((state) => state.loginAsAdmin)
+  const loginAsUploader = useOsmStore((state) => state.loginAsUploader)
+  const loginAsSuperintendent = useOsmStore((state) => state.loginAsSuperintendent)
   const requestDemoOtp = useOsmStore((state) => state.requestDemoOtp)
   const evaluators = useOsmStore((state) => state.evaluators)
+  const uploaders = useOsmStore((state) => state.uploaders)
+  const centres = useOsmStore((state) => state.nodalCentres)
   const [selectedEvaluatorEmail, setSelectedEvaluatorEmail] = useState("")
+  const [selectedUploaderId, setSelectedUploaderId] = useState("")
+  const [selectedCentreId, setSelectedCentreId] = useState("")
   const approvedEvaluators = useMemo(
     () => evaluators.filter((evaluator) => evaluator.status === "approved"),
     [evaluators]
   )
+  const approvedUploaders = useMemo(() => uploaders.filter((uploader) => uploader.status === "approved"), [uploaders])
 
   function handleAdminLogin() {
     loginAsAdmin()
@@ -45,6 +52,14 @@ export function DemoLoginPanel() {
     router.push("/evaluator/verify")
   }
 
+  function handleUploaderLogin() {
+    if (selectedUploaderId && loginAsUploader(selectedUploaderId)) router.push("/uploader/dashboard")
+  }
+
+  function handleSuperintendentLogin() {
+    if (selectedCentreId && loginAsSuperintendent(selectedCentreId)) router.push("/superintendent/dashboard")
+  }
+
   return (
     <Card className="max-w-xl">
       <CardHeader>
@@ -55,7 +70,7 @@ export function DemoLoginPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
           <Button
             type="button"
             className="h-12 justify-start"
@@ -104,6 +119,8 @@ export function DemoLoginPanel() {
               </div>
             )}
           </div>
+          <div className="space-y-2"><label className="text-sm font-medium">Approved uploader</label><select className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" value={selectedUploaderId} onChange={(event) => setSelectedUploaderId(event.target.value)}><option value="">Select uploader</option>{approvedUploaders.map((uploader) => <option key={uploader.id} value={uploader.id}>{uploader.name}</option>)}</select><Button type="button" variant="outline" className="h-12 w-full justify-start" disabled={!selectedUploaderId} onClick={handleUploaderLogin}><UploadCloud data-icon="inline-start" className="size-4" />Nodal Centre Uploader</Button></div>
+          <div className="space-y-2"><label className="text-sm font-medium">Centre superintendent</label><select className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" value={selectedCentreId} onChange={(event) => setSelectedCentreId(event.target.value)}><option value="">Select centre</option>{centres.map((centre) => <option key={centre.id} value={centre.id}>{centre.code} · {centre.superintendent.name}</option>)}</select><Button type="button" variant="outline" className="h-12 w-full justify-start" disabled={!selectedCentreId} onClick={handleSuperintendentLogin}><Building2 data-icon="inline-start" className="size-4" />Centre Superintendent</Button></div>
         </div>
       </CardContent>
     </Card>

@@ -204,6 +204,17 @@ const evaluatorNavigation: NavigationItem[] = [
   },
 ]
 
+const uploaderNavigation: NavigationItem[] = [
+  { href: "/uploader/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/uploader/upload-batches", label: "Upload Batches", icon: Files },
+]
+
+const superintendentNavigation: NavigationItem[] = [
+  { href: "/superintendent/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/superintendent/upload-batches", label: "Centre Uploads", icon: Files },
+  { href: "/superintendent/alerts", label: "Centre Alerts", icon: BellRing },
+]
+
 function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -341,4 +352,12 @@ export function EvaluatorShell({ children }: { children: ReactNode }) {
       {children}
     </RoleShell>
   )
+}
+
+export function UploaderShell({ children }: { children: ReactNode }) {
+  return <RoleShell title="Nodal Centre Uploader" subtitle="Centre script intake" navItems={uploaderNavigation}>{children}</RoleShell>
+}
+
+export function SuperintendentShell({ children }: { children: ReactNode }) {
+  return <RoleShell title="Centre Superintendent" subtitle="Centre examination operations" navItems={superintendentNavigation}>{children}</RoleShell>
 }
