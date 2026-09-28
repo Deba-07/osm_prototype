@@ -33,6 +33,8 @@ import {
   FileOutput,
   ClipboardCheck,
   WalletCards,
+  ShieldAlert,
+  BellRing,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -141,6 +143,16 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/remuneration",
     label: "Remuneration",
     icon: WalletCards,
+  },
+  {
+    href: "/admin/conflicts",
+    label: "Conflict Control",
+    icon: ShieldAlert,
+  },
+  {
+    href: "/admin/alerts",
+    label: "Operational Alerts",
+    icon: BellRing,
   },
   {
     href: "/admin/evaluators",

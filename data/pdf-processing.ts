@@ -4,12 +4,13 @@ export const pdfProcessingJobs: PdfProcessingJob[] = [
   {
     id: "pdf-job-batch-001",
     uploadBatchId: "batch-001",
-    status: "received",
+    status: "failed",
     totalPages: 0,
     detectedPages: 0,
     processedPages: 0,
     generatedScripts: 0,
     progress: 0,
+    errorMessage: "Demo PDF parsing failed during page detection.",
   },
   {
     id: "pdf-job-batch-002",

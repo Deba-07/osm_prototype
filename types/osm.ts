@@ -287,6 +287,47 @@ export type Evaluator = {
   subjectExpertise: string[]
   experienceYears: number
   status: EvaluatorStatus
+  availability?: "available" | "unavailable"
+}
+
+export type OperationalConflictType = "nodal_centre_conflict" | "evaluator_unavailable"
+export type OperationalConflictStatus = "detected" | "under_review" | "resolved"
+
+export type OperationalConflict = {
+  id: string
+  type: OperationalConflictType
+  status: OperationalConflictStatus
+  examId?: string
+  nodalCentreId?: string
+  uploadBatchId?: string
+  evaluatorId?: string
+  affectedScriptIds: string[]
+  description: string
+  detectedAt: string
+  reviewedAt?: string
+  resolvedAt?: string
+  resolutionNote?: string
+}
+
+export type OperationalAlertType = "evaluation_deadline" | "evaluator_inactive" | "script_stuck" | "centre_upload_delayed" | "interrupted_evaluation" | "processing_failure"
+export type OperationalAlertSeverity = "info" | "warning" | "critical"
+export type OperationalAlertStatus = "active"
+
+export type OperationalAlert = {
+  id: string
+  type: OperationalAlertType
+  severity: OperationalAlertSeverity
+  title: string
+  message: string
+  createdAt: string
+  status: OperationalAlertStatus
+  examId?: string
+  evaluatorId?: string
+  scriptId?: string
+  uploadBatchId?: string
+  nodalCentreId?: string
+  processingJobId?: string
+  details: Record<string, string | number>
 }
 
 export type ExamPaperType = "regular" | "midterm" | "supplementary"

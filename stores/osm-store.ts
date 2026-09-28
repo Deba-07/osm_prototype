@@ -4,6 +4,7 @@ import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
 import { initialAdminAdjustments } from "@/data/admin-adjustments"
 import { initialAuditLogs } from "@/data/audit-logs"
+import { initialOperationalConflicts } from "@/data/operational-conflicts"
 import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
 import { uploaders as initialUploaders } from "@/data/uploaders"
 import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
@@ -45,6 +46,7 @@ import {
 } from "@/lib/upload-batches"
 import { canStartPdfProcessing } from "@/lib/pdf-processing"
 import { validateScriptMapping } from "@/lib/script-mappings"
+import { getRemainingEvaluatorSheets, planEvaluatorRedistribution } from "@/lib/conflicts"
 import {
   getAdditionalScriptCandidates,
   planAutomaticScriptDistribution,
@@ -98,6 +100,7 @@ import type {
   AdminAdjustment,
   AuditAction,
   AuditLog,
+  OperationalConflict,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -129,6 +132,7 @@ type OsmStoreState = {
   adminAdjustments: AdminAdjustment[]
   auditLogs: AuditLog[]
   finalizedResultIds: string[]
+  operationalConflicts: OperationalConflict[]
   evaluationSessions: EvaluationSession[]
   scriptExceptions: ScriptException[]
 }
@@ -185,6 +189,10 @@ type OsmStoreActions = {
   }) => AdminAdjustment | undefined
   addAuditLog: (input: { action: AuditAction; entityType?: string; entityId?: string; examId?: string; scriptId?: string; description: string; metadata?: Record<string, string | number>; dedupeWindowMs?: number }) => AuditLog | undefined
   finalizeResult: (evaluationId: string) => boolean
+  setEvaluatorAvailability: (evaluatorId: string, availability: "available" | "unavailable") => boolean
+  redistributeEvaluatorWork: (evaluatorId: string) => { remainingBefore: number; redistributed: number; stillRemaining: number; message?: string }
+  startConflictReview: (conflictId: string) => boolean
+  resolveConflict: (conflictId: string, resolutionNote: string) => boolean
   startEvaluationSession: (input: {
     evaluatorId: string
     scriptId: string
@@ -328,7 +336,18 @@ function cloneInitialState(): OsmStoreState {
     adminAdjustments: initialAdminAdjustments.map((adjustment) => ({ ...adjustment })),
     auditLogs: initialAuditLogs.map((log) => ({ ...log, metadata: log.metadata ? { ...log.metadata } : undefined })),
     finalizedResultIds: ["evaluation-as-cse-dsa-001"],
-    evaluationSessions: [],
+    operationalConflicts: initialOperationalConflicts.map((conflict) => ({ ...conflict, affectedScriptIds: [...conflict.affectedScriptIds] })),
+    evaluationSessions: [
+      {
+        id: "evaluation-session-demo-stuck-001",
+        evaluatorId: "eval-cse-ananya-sen",
+        scriptId: "script-batch-002-002",
+        status: "interrupted",
+        startedAt: "2026-08-22T09:00:00.000Z",
+        lastSavedAt: "2026-08-22T09:35:00.000Z",
+        interruptedAt: "2026-08-22T09:40:00.000Z",
+      },
+    ],
     scriptExceptions: initialScriptExceptions.map((exception) => ({ ...exception })),
   }
 }
@@ -1731,6 +1750,37 @@ export const useOsmStore = create<OsmStore>()(
         })
         return true
       },
+      setEvaluatorAvailability: (evaluatorId, availability) => {
+        const evaluator = get().evaluators.find((item) => item.id === evaluatorId)
+        if (!evaluator || evaluator.status !== "approved" || evaluator.availability === availability) return false
+        set((state) => ({ evaluators: state.evaluators.map((item) => item.id === evaluatorId ? { ...item, availability } : item) }))
+        return true
+      },
+      redistributeEvaluatorWork: (evaluatorId) => {
+        const state = get()
+        const evaluator = state.evaluators.find((item) => item.id === evaluatorId)
+        if (!evaluator || evaluator.status !== "approved" || evaluator.availability !== "unavailable") return { remainingBefore: 0, redistributed: 0, stillRemaining: 0, message: "Mark an approved evaluator unavailable before redistribution." }
+        const remainingSheets = getRemainingEvaluatorSheets({ evaluatorId, answerSheets: state.answerSheets, evaluations: state.evaluations })
+        if (remainingSheets.length === 0) return { remainingBefore: 0, redistributed: 0, stillRemaining: 0, message: "No remaining scripts to redistribute." }
+        const plan = planEvaluatorRedistribution({ unavailableEvaluatorId: evaluatorId, remainingSheets, answerSheets: state.answerSheets, evaluators: state.evaluators })
+        set((currentState) => ({ answerSheets: currentState.answerSheets.map((sheet) => { const assignment = plan.assignments.find((item) => item.answerSheetId === sheet.id); return assignment ? { ...sheet, assignedEvaluatorId: assignment.evaluatorId, status: "assigned" as const } : sheet }) }))
+        return { remainingBefore: remainingSheets.length, redistributed: plan.assignments.length, stillRemaining: plan.remainingSheetIds.length, message: plan.assignments.length === 0 ? "No eligible evaluator capacity available." : undefined }
+      },
+      startConflictReview: (conflictId) => {
+        const conflict = get().operationalConflicts.find((item) => item.id === conflictId)
+        if (!conflict || conflict.status !== "detected") return false
+        const now = new Date().toISOString()
+        set((state) => ({ operationalConflicts: state.operationalConflicts.map((item) => item.id === conflictId ? { ...item, status: "under_review", reviewedAt: now } : item) }))
+        return true
+      },
+      resolveConflict: (conflictId, resolutionNote) => {
+        const conflict = get().operationalConflicts.find((item) => item.id === conflictId)
+        const note = resolutionNote.trim()
+        if (!conflict || conflict.status !== "under_review" || !note) return false
+        const now = new Date().toISOString()
+        set((state) => ({ operationalConflicts: state.operationalConflicts.map((item) => item.id === conflictId ? { ...item, status: "resolved", resolutionNote: note, resolvedAt: now } : item) }))
+        return true
+      },
       resetDemo: () => {
         set(cloneInitialState())
       },
@@ -1762,6 +1812,7 @@ export const useOsmStore = create<OsmStore>()(
         scriptExceptions: state.scriptExceptions,
         auditLogs: state.auditLogs,
         finalizedResultIds: state.finalizedResultIds,
+        operationalConflicts: state.operationalConflicts,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<OsmStoreState> | undefined
@@ -1784,6 +1835,7 @@ export const useOsmStore = create<OsmStore>()(
           scriptExceptions: persisted?.scriptExceptions ?? currentState.scriptExceptions,
           auditLogs: persisted?.auditLogs ?? currentState.auditLogs,
           finalizedResultIds: persisted?.finalizedResultIds ?? currentState.finalizedResultIds,
+          operationalConflicts: persisted?.operationalConflicts ?? currentState.operationalConflicts,
         }
       },
       version: 1,

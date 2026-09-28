@@ -84,6 +84,9 @@ function buildAnswerSheets({
       pageImages: pageImages(id),
       assignedEvaluatorId: plan.assignedEvaluatorId,
       status: plan.status,
+      ...(series === "cse-dsa" && index === 1
+        ? { processedScriptId: "script-batch-002-002" }
+        : {}),
     }
   })
 }
