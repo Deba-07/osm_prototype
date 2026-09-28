@@ -26,6 +26,8 @@ import {
   Trophy,
   UserCheck,
   Users,
+  AlertTriangle,
+  Activity,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -49,6 +51,11 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/admin/operations",
+    label: "Examination Operations",
+    icon: Activity,
   },
   {
     href: "/admin/students",
@@ -99,6 +106,11 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/evaluator-sessions",
     label: "Evaluator Sessions",
     icon: KeyRound,
+  },
+  {
+    href: "/admin/exceptions",
+    label: "Exception Queue",
+    icon: AlertTriangle,
   },
   {
     href: "/admin/evaluators",

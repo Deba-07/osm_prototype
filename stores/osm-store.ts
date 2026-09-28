@@ -48,6 +48,7 @@ import {
 } from "@/lib/script-distribution"
 import { validateAdditionalScriptRequest } from "@/lib/additional-script-requests"
 import { additionalScriptRequests as initialAdditionalScriptRequests } from "@/data/additional-script-requests"
+import { scriptExceptions as initialScriptExceptions } from "@/data/script-exceptions"
 import {
   DEMO_OTP_CODE,
   DEMO_OTP_DURATION_MS,
@@ -89,6 +90,7 @@ import type {
   DemoOtpChallenge,
   DemoOtpRequestResult,
   DemoOtpVerificationResult,
+  ScriptException,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -118,6 +120,7 @@ type OsmStoreState = {
   answerSheets: AnswerSheet[]
   evaluations: Evaluation[]
   evaluationSessions: EvaluationSession[]
+  scriptExceptions: ScriptException[]
 }
 
 type OsmStoreActions = {
@@ -182,6 +185,8 @@ type OsmStoreActions = {
     evaluatorId: string
     scriptId: string
   }) => boolean
+  startExceptionReview: (exceptionId: string) => boolean
+  resolveException: (exceptionId: string, resolutionNote: string) => boolean
   resetDemo: () => void
 }
 
@@ -304,6 +309,7 @@ function cloneInitialState(): OsmStoreState {
       })),
     })),
     evaluationSessions: [],
+    scriptExceptions: initialScriptExceptions.map((exception) => ({ ...exception })),
   }
 }
 
@@ -1354,6 +1360,68 @@ export const useOsmStore = create<OsmStore>()(
 
         return true
       },
+      startExceptionReview: (exceptionId) => {
+        const exception = get().scriptExceptions.find(
+          (item) => item.id === exceptionId
+        )
+        const currentUser = get().currentUser
+        const reviewerId = currentUser?.role === "admin"
+          ? currentUser.id
+          : undefined
+
+        if (!exception || exception.status !== "open") {
+          return false
+        }
+
+        const now = new Date().toISOString()
+        set((state) => ({
+          scriptExceptions: state.scriptExceptions.map((item) =>
+            item.id === exceptionId
+              ? {
+                  ...item,
+                  status: "under_review",
+                  reviewedAt: now,
+                  reviewedBy: reviewerId,
+                  updatedAt: now,
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
+      resolveException: (exceptionId, resolutionNote) => {
+        const exception = get().scriptExceptions.find(
+          (item) => item.id === exceptionId
+        )
+        const note = resolutionNote.trim()
+        const currentUser = get().currentUser
+        const resolverId = currentUser?.role === "admin"
+          ? currentUser.id
+          : undefined
+
+        if (!exception || exception.status !== "under_review" || !note) {
+          return false
+        }
+
+        const now = new Date().toISOString()
+        set((state) => ({
+          scriptExceptions: state.scriptExceptions.map((item) =>
+            item.id === exceptionId
+              ? {
+                  ...item,
+                  status: "resolved",
+                  resolutionNote: note,
+                  resolvedAt: now,
+                  resolvedBy: resolverId,
+                  updatedAt: now,
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
       saveEvaluationDraft: (input) => {
         const validation = validateEvaluationDraftInput({
           input,
@@ -1495,6 +1563,7 @@ export const useOsmStore = create<OsmStore>()(
         answerSheets: state.answerSheets,
         evaluations: state.evaluations,
         evaluationSessions: state.evaluationSessions,
+        scriptExceptions: state.scriptExceptions,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<OsmStoreState> | undefined
@@ -1513,6 +1582,7 @@ export const useOsmStore = create<OsmStore>()(
             ? normalizeExamReferences(persisted.evaluations)
             : currentState.evaluations,
           evaluationSessions: persisted?.evaluationSessions ?? currentState.evaluationSessions,
+          scriptExceptions: persisted?.scriptExceptions ?? currentState.scriptExceptions,
         }
       },
       version: 1,

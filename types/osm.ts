@@ -161,6 +161,32 @@ export type ProcessedScript = {
   generatedAt: string
 }
 
+export type ScriptExceptionType =
+  | "roll_number_mismatch"
+  | "missing_page"
+  | "duplicate_roll_number"
+  | "pdf_processing_error"
+  | "incomplete_script"
+  | "upload_problem"
+
+export type ScriptExceptionStatus = "open" | "under_review" | "resolved"
+
+export type ScriptException = {
+  id: string
+  scriptId: string
+  type: ScriptExceptionType
+  status: ScriptExceptionStatus
+  details: string
+  createdAt: string
+  updatedAt: string
+  reviewedAt?: string
+  resolvedAt?: string
+  resolutionNote?: string
+  createdBy?: string
+  reviewedBy?: string
+  resolvedBy?: string
+}
+
 export type ProcessedPageStatus = "protected" | "evaluator_visible"
 
 export type ProcessedPage = {
