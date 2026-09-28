@@ -3,6 +3,7 @@
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
 import { initialAdminAdjustments } from "@/data/admin-adjustments"
+import { initialAuditLogs } from "@/data/audit-logs"
 import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
 import { uploaders as initialUploaders } from "@/data/uploaders"
 import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
@@ -95,6 +96,8 @@ import type {
   DemoOtpVerificationResult,
   ScriptException,
   AdminAdjustment,
+  AuditAction,
+  AuditLog,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -124,6 +127,8 @@ type OsmStoreState = {
   answerSheets: AnswerSheet[]
   evaluations: Evaluation[]
   adminAdjustments: AdminAdjustment[]
+  auditLogs: AuditLog[]
+  finalizedResultIds: string[]
   evaluationSessions: EvaluationSession[]
   scriptExceptions: ScriptException[]
 }
@@ -178,6 +183,8 @@ type OsmStoreActions = {
     adjustmentMarks: number
     reason: string
   }) => AdminAdjustment | undefined
+  addAuditLog: (input: { action: AuditAction; entityType?: string; entityId?: string; examId?: string; scriptId?: string; description: string; metadata?: Record<string, string | number>; dedupeWindowMs?: number }) => AuditLog | undefined
+  finalizeResult: (evaluationId: string) => boolean
   startEvaluationSession: (input: {
     evaluatorId: string
     scriptId: string
@@ -319,6 +326,8 @@ function cloneInitialState(): OsmStoreState {
       })),
     })),
     adminAdjustments: initialAdminAdjustments.map((adjustment) => ({ ...adjustment })),
+    auditLogs: initialAuditLogs.map((log) => ({ ...log, metadata: log.metadata ? { ...log.metadata } : undefined })),
+    finalizedResultIds: ["evaluation-as-cse-dsa-001"],
     evaluationSessions: [],
     scriptExceptions: initialScriptExceptions.map((exception) => ({ ...exception })),
   }
@@ -362,6 +371,15 @@ export const useOsmStore = create<OsmStore>()(
           demoOtpChallenge: null,
           evaluatorSession: null,
         })
+      },
+      addAuditLog: ({ action, entityType, entityId, examId, scriptId, description, metadata, dedupeWindowMs = 0 }) => {
+        const currentUser = get().currentUser
+        const now = new Date().toISOString()
+        const latest = get().auditLogs[0]
+        if (dedupeWindowMs && latest?.action === action && latest.entityId === entityId && Date.parse(now) - Date.parse(latest.timestamp) < dedupeWindowMs) return latest
+        const log: AuditLog = { id: createDemoId("audit"), action, actorId: currentUser?.id, actorName: currentUser?.name, actorRole: currentUser?.role, entityType, entityId, examId, scriptId, description, timestamp: now, metadata }
+        set((state) => ({ auditLogs: [log, ...state.auditLogs] }))
+        return log
       },
       loginAsEvaluator: (evaluatorId) => {
         const evaluator = get().evaluators.find(
@@ -603,6 +621,13 @@ export const useOsmStore = create<OsmStore>()(
           ),
         }))
 
+        get().addAuditLog({
+          action: "evaluator_approved",
+          entityType: "evaluator",
+          entityId: evaluator.id,
+          description: `Evaluator ${evaluator.name} approved.`,
+        })
+
         return true
       },
       rejectEvaluator: (evaluatorId) => {
@@ -756,6 +781,18 @@ export const useOsmStore = create<OsmStore>()(
           uploadBatches: [uploadBatch, ...state.uploadBatches],
         }))
 
+        const exam = get().exams.find((item) => item.id === uploadBatch.examId)
+        const nodalCentre = get().nodalCentres.find((item) => item.id === uploadBatch.nodalCentreId)
+        const uploader = get().uploaders.find((item) => item.id === uploadBatch.uploaderId)
+        get().addAuditLog({
+          action: "batch_uploaded",
+          entityType: "upload-batch",
+          entityId: uploadBatch.id,
+          examId: uploadBatch.examId,
+          description: `Batch ${uploadBatch.batchNumber} uploaded for ${exam?.name ?? "exam"}.`,
+          metadata: { nodalCentre: nodalCentre?.name ?? "Unavailable", uploader: uploader?.name ?? "Unavailable" },
+        })
+
         return uploadBatch
       },
       startPdfProcessing: (uploadBatchId) => {
@@ -860,6 +897,20 @@ export const useOsmStore = create<OsmStore>()(
               ]
             : state.processedScripts,
         }))
+
+        if (nextJob.status === "completed") {
+          const processedBatch = get().uploadBatches.find((item) => item.id === uploadBatchId)
+          const processedExamId = processedBatch?.examId
+          get().addAuditLog({
+            action: "pdf_processed",
+            entityType: "processing-job",
+            entityId: nextJob.id,
+            examId: processedExamId,
+            scriptId: generatedScript?.id,
+            description: `PDF processed for ${uploadBatchId}; ${nextJob.generatedScripts} script(s) generated.`,
+            metadata: { batchId: uploadBatchId, generatedScripts: nextJob.generatedScripts },
+          })
+        }
 
         return nextJob
       },
@@ -1051,6 +1102,19 @@ export const useOsmStore = create<OsmStore>()(
           answerSheets: nextAnswerSheets,
           lastDistributionSummary: completedPlan.summary,
         })
+
+        if (completedPlan.summary.distributed > 0) {
+          const firstAssignment = plan.assignments[0]
+          get().addAuditLog({
+            action: "script_assigned",
+            entityType: "script-distribution",
+            entityId: firstAssignment?.scriptId ?? "automatic-distribution",
+            scriptId: firstAssignment?.scriptId,
+            examId: firstAssignment ? get().processedScripts.find((script) => script.id === firstAssignment.scriptId)?.uploadBatchId ? get().uploadBatches.find((batch) => batch.id === get().processedScripts.find((script) => script.id === firstAssignment.scriptId)?.uploadBatchId)?.examId : undefined : undefined,
+            description: `${completedPlan.summary.distributed} script(s) assigned through automatic distribution.`,
+            metadata: { assignedCount: completedPlan.summary.distributed },
+          })
+        }
 
         return completedPlan.summary
       },
@@ -1280,6 +1344,17 @@ export const useOsmStore = create<OsmStore>()(
           ),
         }))
 
+        if (!existingSession || existingSession.status === "interrupted") {
+          get().addAuditLog({
+            action: "evaluation_started",
+            entityType: "evaluation-session",
+            entityId: nextSession.id,
+            scriptId,
+            examId: get().answerSheets.find((sheet) => (sheet.processedScriptId ?? sheet.id) === scriptId)?.examId,
+            description: `Evaluation started for ${scriptId}.`,
+          })
+        }
+
         return nextSession
       },
       resumeEvaluationSession: ({ evaluatorId, scriptId }) => {
@@ -1316,6 +1391,16 @@ export const useOsmStore = create<OsmStore>()(
               : session
           ),
         }))
+
+        get().addAuditLog({
+          action: "marks_saved",
+          entityType: "evaluation",
+          entityId: savedEvaluation.id,
+          scriptId,
+          examId: savedEvaluation.examId,
+          description: `Evaluation marks saved for ${scriptId}.`,
+          dedupeWindowMs: 30_000,
+        })
 
         return savedEvaluation
       },
@@ -1539,6 +1624,16 @@ export const useOsmStore = create<OsmStore>()(
           ),
         }))
 
+        const answerSheet = get().answerSheets.find((item) => item.id === submittedEvaluation.answerSheetId)
+        get().addAuditLog({
+          action: "evaluation_submitted",
+          entityType: "evaluation",
+          entityId: submittedEvaluation.id,
+          scriptId: answerSheet?.processedScriptId ?? submittedEvaluation.answerSheetId,
+          examId: submittedEvaluation.examId,
+          description: `Evaluation submitted for ${answerSheet?.processedScriptId ?? submittedEvaluation.answerSheetId}.`,
+        })
+
         get().completeEvaluationSession({
           evaluatorId: validation.evaluator.id,
           scriptId:
@@ -1611,7 +1706,30 @@ export const useOsmStore = create<OsmStore>()(
             adjustment,
           ],
         }))
+        get().addAuditLog({
+          action: "admin_adjustment",
+          entityType: "evaluation",
+          entityId: evaluationId,
+          scriptId,
+          examId: evaluation.examId,
+          description: `Administrative adjustment applied: ${evaluation.totalMarks} + ${adjustmentMarks} = ${adjustment.finalMarks}.`,
+          metadata: { scriptId, evaluatorMarks: evaluation.totalMarks, adjustmentMarks, finalMarks: adjustment.finalMarks },
+        })
         return adjustment
+      },
+      finalizeResult: (evaluationId) => {
+        const evaluation = get().evaluations.find((item) => item.id === evaluationId)
+        if (!evaluation || evaluation.status !== "submitted" || get().finalizedResultIds.includes(evaluationId)) return false
+        set((state) => ({ finalizedResultIds: [...state.finalizedResultIds, evaluationId] }))
+        get().addAuditLog({
+          action: "result_finalized",
+          entityType: "result",
+          entityId: evaluationId,
+          examId: evaluation.examId,
+          scriptId: get().answerSheets.find((sheet) => sheet.id === evaluation.answerSheetId)?.processedScriptId,
+          description: `Result finalized for ${evaluation.studentId}.`,
+        })
+        return true
       },
       resetDemo: () => {
         set(cloneInitialState())
@@ -1642,6 +1760,8 @@ export const useOsmStore = create<OsmStore>()(
         adminAdjustments: state.adminAdjustments,
         evaluationSessions: state.evaluationSessions,
         scriptExceptions: state.scriptExceptions,
+        auditLogs: state.auditLogs,
+        finalizedResultIds: state.finalizedResultIds,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<OsmStoreState> | undefined
@@ -1662,6 +1782,8 @@ export const useOsmStore = create<OsmStore>()(
           adminAdjustments: persisted?.adminAdjustments ?? currentState.adminAdjustments,
           evaluationSessions: persisted?.evaluationSessions ?? currentState.evaluationSessions,
           scriptExceptions: persisted?.scriptExceptions ?? currentState.scriptExceptions,
+          auditLogs: persisted?.auditLogs ?? currentState.auditLogs,
+          finalizedResultIds: persisted?.finalizedResultIds ?? currentState.finalizedResultIds,
         }
       },
       version: 1,

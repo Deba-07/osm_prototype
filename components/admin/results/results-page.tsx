@@ -72,6 +72,8 @@ export function ResultsPage() {
   const answerSheets = useOsmStore((state) => state.answerSheets)
   const evaluations = useOsmStore((state) => state.evaluations)
   const adminAdjustments = useOsmStore((state) => state.adminAdjustments)
+  const finalizedResultIds = useOsmStore((state) => state.finalizedResultIds)
+  const finalizeResult = useOsmStore((state) => state.finalizeResult)
   const [filters, setFilters] = useState<ResultFilterState>(defaultFilters)
   const [sortKey, setSortKey] = useState<ResultSortKey>("submittedAt")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
@@ -254,6 +256,10 @@ export function ResultsPage() {
 
       <ResultDetails
         result={selectedResult}
+        isFinalized={Boolean(selectedResult && finalizedResultIds.includes(selectedResult.evaluationId))}
+        onFinalize={() => {
+          if (selectedResult) finalizeResult(selectedResult.evaluationId)
+        }}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedResultId(null)

@@ -424,6 +424,45 @@ export type AdminAdjustment = {
   createdBy?: string
 }
 
+export type AuditAction =
+  | "evaluator_approved"
+  | "batch_uploaded"
+  | "pdf_processed"
+  | "script_assigned"
+  | "evaluation_started"
+  | "marks_saved"
+  | "evaluation_submitted"
+  | "admin_adjustment"
+  | "result_finalized"
+
+export type AuditLog = {
+  id: string
+  action: AuditAction
+  actorId?: string
+  actorName?: string
+  actorRole?: string
+  entityType?: string
+  entityId?: string
+  examId?: string
+  scriptId?: string
+  description: string
+  timestamp: string
+  metadata?: Record<string, string | number>
+}
+
+export type EvaluatorRemuneration = {
+  id: string
+  evaluatorId: string
+  examId?: string
+  completedScripts: number
+  ratePerScript: number
+  evaluationAmount: number
+  taDaAmount: number
+  totalAmount: number
+  status: "calculated"
+  calculatedAt: string
+}
+
 export type MockUserRole = "admin" | "evaluator"
 
 export type MockUser = {

@@ -31,6 +31,8 @@ import {
   FileArchive,
   ClipboardPlus,
   FileOutput,
+  ClipboardCheck,
+  WalletCards,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -131,6 +133,16 @@ const adminNavigation: NavigationItem[] = [
     icon: FileOutput,
   },
   {
+    href: "/admin/audit-trail",
+    label: "Audit Trail",
+    icon: ClipboardCheck,
+  },
+  {
+    href: "/admin/remuneration",
+    label: "Remuneration",
+    icon: WalletCards,
+  },
+  {
     href: "/admin/evaluators",
     label: "Evaluators",
     icon: UserCheck,
@@ -172,6 +184,11 @@ const evaluatorNavigation: NavigationItem[] = [
     href: "/evaluator/completed",
     label: "Completed",
     icon: CheckCircle2,
+  },
+  {
+    href: "/evaluator/remuneration",
+    label: "Remuneration",
+    icon: WalletCards,
   },
 ]
 
