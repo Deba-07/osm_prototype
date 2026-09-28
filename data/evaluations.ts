@@ -29,7 +29,7 @@ function buildQuestionMarks(
   subjectId: string,
   examId: string
 ): QuestionMark[] {
-  return examQuestions
+  const marks = examQuestions
     .filter(
       (question) =>
         question.subjectId === subjectId && question.examId === examId
@@ -43,6 +43,19 @@ function buildQuestionMarks(
         question.maximumMarks - ((answerSheetIndex + questionIndex) % 5)
       ),
     }))
+
+  if (
+    subjectId === "sub-cse-dsa" &&
+    examId === "exam-2026-sem3-cs203-midterm" &&
+    answerSheetIndex === 0
+  ) {
+    return marks.map((mark, index) => ({
+      ...mark,
+      marksAwarded: [14, 13, 12, 11, 12][index] ?? mark.marksAwarded,
+    }))
+  }
+
+  return marks
 }
 
 function buildDraftQuestionMarks(

@@ -2,6 +2,7 @@
 
 import { answerSheets as initialAnswerSheets } from "@/data/answer-sheets"
 import { initialEvaluations } from "@/data/evaluations"
+import { initialAdminAdjustments } from "@/data/admin-adjustments"
 import { nodalCentres as initialNodalCentres } from "@/data/nodal-centres"
 import { uploaders as initialUploaders } from "@/data/uploaders"
 import { uploadBatches as initialUploadBatches } from "@/data/upload-batches"
@@ -34,6 +35,7 @@ import {
 import {
   validateEvaluationDraftInput,
   validateEvaluationSubmissionInput,
+  getEvaluationQuestions,
 } from "@/lib/evaluations"
 import { validateUploaderRegistration } from "@/lib/uploaders"
 import {
@@ -47,6 +49,7 @@ import {
   planAutomaticScriptDistribution,
 } from "@/lib/script-distribution"
 import { validateAdditionalScriptRequest } from "@/lib/additional-script-requests"
+import { calculateFinalMarks, validateAdjustmentInput } from "@/lib/admin-adjustments"
 import { additionalScriptRequests as initialAdditionalScriptRequests } from "@/data/additional-script-requests"
 import { scriptExceptions as initialScriptExceptions } from "@/data/script-exceptions"
 import {
@@ -91,6 +94,7 @@ import type {
   DemoOtpRequestResult,
   DemoOtpVerificationResult,
   ScriptException,
+  AdminAdjustment,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -119,6 +123,7 @@ type OsmStoreState = {
   evaluators: Evaluator[]
   answerSheets: AnswerSheet[]
   evaluations: Evaluation[]
+  adminAdjustments: AdminAdjustment[]
   evaluationSessions: EvaluationSession[]
   scriptExceptions: ScriptException[]
 }
@@ -168,6 +173,11 @@ type OsmStoreActions = {
     input: EvaluationDraftInput
   ) => Evaluation | undefined
   submitEvaluation: (input: EvaluationDraftInput) => Evaluation | undefined
+  applyAdminAdjustment: (input: {
+    evaluationId: string
+    adjustmentMarks: number
+    reason: string
+  }) => AdminAdjustment | undefined
   startEvaluationSession: (input: {
     evaluatorId: string
     scriptId: string
@@ -308,6 +318,7 @@ function cloneInitialState(): OsmStoreState {
         ...questionMark,
       })),
     })),
+    adminAdjustments: initialAdminAdjustments.map((adjustment) => ({ ...adjustment })),
     evaluationSessions: [],
     scriptExceptions: initialScriptExceptions.map((exception) => ({ ...exception })),
   }
@@ -1536,6 +1547,72 @@ export const useOsmStore = create<OsmStore>()(
 
         return submittedEvaluation
       },
+      applyAdminAdjustment: ({ evaluationId, adjustmentMarks, reason }) => {
+        const state = get()
+        const currentUser = state.currentUser
+        const evaluation = state.evaluations.find((item) => item.id === evaluationId)
+        const answerSheet = evaluation
+          ? state.answerSheets.find((item) => item.id === evaluation.answerSheetId)
+          : undefined
+        const subject = evaluation
+          ? subjects.find((item) => item.id === evaluation.subjectId)
+          : undefined
+        const maximumMarks = evaluation
+          ? Math.max(
+              getEvaluationQuestions({
+                answerSheet: answerSheet ?? {
+                  id: evaluation.answerSheetId,
+                  studentId: evaluation.studentId,
+                  subjectId: evaluation.subjectId,
+                  examId: evaluation.examId,
+                  semesterId: evaluation.semesterId,
+                  pageImages: [],
+                  assignedEvaluatorId: evaluation.evaluatorId,
+                  status: "completed",
+                },
+                questions: examQuestions,
+              }).reduce((total, question) => total + question.maximumMarks, 0),
+              subject?.maximumMarks ?? 0
+            )
+          : 0
+        const validationError = validateAdjustmentInput({
+          evaluation,
+          adjustmentMarks,
+          reason,
+          maximumMarks,
+        })
+
+        if (currentUser?.role !== "admin" || validationError || !evaluation) {
+          return undefined
+        }
+
+        const mapping = state.scriptMappings.find(
+          (item) => item.studentId === evaluation.studentId && item.status === "valid"
+        )
+        const scriptId = answerSheet?.processedScriptId ?? mapping?.scriptId ?? evaluation.answerSheetId
+        const now = new Date().toISOString()
+        const existing = state.adminAdjustments.find((item) => item.evaluationId === evaluationId)
+        const adjustment: AdminAdjustment = {
+          id: existing?.id ?? createDemoId("admin-adjustment"),
+          evaluationId,
+          scriptId,
+          evaluatorMarks: evaluation.totalMarks,
+          adjustmentMarks,
+          finalMarks: calculateFinalMarks(evaluation.totalMarks, adjustmentMarks),
+          reason: reason.trim(),
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          createdBy: existing?.createdBy ?? currentUser.id,
+        }
+
+        set((currentState) => ({
+          adminAdjustments: [
+            ...currentState.adminAdjustments.filter((item) => item.evaluationId !== evaluationId),
+            adjustment,
+          ],
+        }))
+        return adjustment
+      },
       resetDemo: () => {
         set(cloneInitialState())
       },
@@ -1562,6 +1639,7 @@ export const useOsmStore = create<OsmStore>()(
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,
         evaluations: state.evaluations,
+        adminAdjustments: state.adminAdjustments,
         evaluationSessions: state.evaluationSessions,
         scriptExceptions: state.scriptExceptions,
       }),
@@ -1581,6 +1659,7 @@ export const useOsmStore = create<OsmStore>()(
           evaluations: persisted?.evaluations
             ? normalizeExamReferences(persisted.evaluations)
             : currentState.evaluations,
+          adminAdjustments: persisted?.adminAdjustments ?? currentState.adminAdjustments,
           evaluationSessions: persisted?.evaluationSessions ?? currentState.evaluationSessions,
           scriptExceptions: persisted?.scriptExceptions ?? currentState.scriptExceptions,
         }

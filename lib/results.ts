@@ -1,4 +1,5 @@
 import { getEvaluationQuestions } from "@/lib/evaluations"
+import { getEffectiveEvaluationMarks } from "@/lib/admin-adjustments"
 import type {
   AnswerSheet,
   Department,
@@ -11,6 +12,7 @@ import type {
   Semester,
   Student,
   Subject,
+  AdminAdjustment,
 } from "@/types/osm"
 
 export type ResultQuestionMark = QuestionMark & {
@@ -106,6 +108,7 @@ type ResultRelationshipData = {
   programs?: Program[]
   semesters?: Semester[]
   evaluators?: Evaluator[]
+  adminAdjustments?: AdminAdjustment[]
 }
 
 const resultCollator = new Intl.Collator("en", {
@@ -264,6 +267,7 @@ export function deriveResult({
   programs,
   semesters,
   evaluators,
+  adminAdjustments = [],
 }: Omit<ResultRelationshipData, "evaluations"> & {
   evaluation: Evaluation
 }): DerivedResult | undefined {
@@ -295,7 +299,9 @@ export function deriveResult({
     subject,
     questions,
   })
-  const totalMarks = Number(evaluation.totalMarks.toFixed(2))
+  const totalMarks = Number(
+    getEffectiveEvaluationMarks(evaluation, adminAdjustments).toFixed(2)
+  )
 
   return {
     id: `result-${evaluation.id}`,
@@ -342,6 +348,7 @@ export function deriveResultsFromEvaluations({
   programs = [],
   semesters = [],
   evaluators = [],
+  adminAdjustments = [],
 }: ResultRelationshipData): StudentSubjectResult[] {
   return getSubmittedEvaluations(evaluations).flatMap((evaluation) => {
     const result = deriveResult({
@@ -355,6 +362,7 @@ export function deriveResultsFromEvaluations({
       programs,
       semesters,
       evaluators,
+      adminAdjustments,
     })
 
     return result ? [result] : []

@@ -187,6 +187,19 @@ export type ScriptException = {
   resolvedBy?: string
 }
 
+export type EvaluationCopyType = "pre_evaluation" | "post_evaluation"
+
+export type EvaluationCopyStatus = "available" | "unavailable"
+
+export type EvaluationCopy = {
+  id: string
+  scriptId: string
+  type: EvaluationCopyType
+  createdAt: string
+  sourceVersion: string
+  status: EvaluationCopyStatus
+}
+
 export type ProcessedPageStatus = "protected" | "evaluator_visible"
 
 export type ProcessedPage = {
@@ -396,6 +409,19 @@ export type Evaluation = {
   status: EvaluationStatus
   startedAt?: string
   submittedAt?: string
+}
+
+export type AdminAdjustment = {
+  id: string
+  evaluationId: string
+  scriptId: string
+  evaluatorMarks: number
+  adjustmentMarks: number
+  finalMarks: number
+  reason: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
 }
 
 export type MockUserRole = "admin" | "evaluator"

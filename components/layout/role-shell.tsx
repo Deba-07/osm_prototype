@@ -28,6 +28,9 @@ import {
   Users,
   AlertTriangle,
   Activity,
+  FileArchive,
+  ClipboardPlus,
+  FileOutput,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -111,6 +114,21 @@ const adminNavigation: NavigationItem[] = [
     href: "/admin/exceptions",
     label: "Exception Queue",
     icon: AlertTriangle,
+  },
+  {
+    href: "/admin/script-copies",
+    label: "Script Copies",
+    icon: FileArchive,
+  },
+  {
+    href: "/admin/adjustments",
+    label: "Adjustments",
+    icon: ClipboardPlus,
+  },
+  {
+    href: "/admin/result-export",
+    label: "Result Export",
+    icon: FileOutput,
   },
   {
     href: "/admin/evaluators",
