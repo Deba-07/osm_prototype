@@ -3,11 +3,15 @@
 import { DemoSessionControls } from "@/components/layout/demo-session-controls"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { isDemoSessionActive } from "@/lib/demo-auth"
+import { useOsmStore } from "@/stores/osm-store"
 import type { LucideIcon } from "lucide-react"
 import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
+  ClipboardPenLine,
+  KeyRound,
   FileStack,
   LayoutDashboard,
   Building2,
@@ -16,6 +20,7 @@ import {
   Files,
   Workflow,
   GitBranch,
+  Shuffle,
   ListChecks,
   School,
   Trophy,
@@ -81,6 +86,21 @@ const adminNavigation: NavigationItem[] = [
     icon: GitBranch,
   },
   {
+    href: "/admin/distribution",
+    label: "Distribution",
+    icon: Shuffle,
+  },
+  {
+    href: "/admin/additional-script-requests",
+    label: "Additional Requests",
+    icon: ClipboardPenLine,
+  },
+  {
+    href: "/admin/evaluator-sessions",
+    label: "Evaluator Sessions",
+    icon: KeyRound,
+  },
+  {
     href: "/admin/evaluators",
     label: "Evaluators",
     icon: UserCheck,
@@ -131,6 +151,13 @@ function isActivePath(pathname: string, href: string) {
 
 function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
   const pathname = usePathname()
+  const currentUser = useOsmStore((state) => state.currentUser)
+  const evaluatorSession = useOsmStore((state) => state.evaluatorSession)
+  const showEvaluatorSession =
+    title === "Evaluator Workspace" && currentUser?.role === "evaluator"
+  const evaluatorSessionActive = showEvaluatorSession
+    ? isDemoSessionActive(evaluatorSession, currentUser.evaluatorId)
+    : false
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -189,6 +216,18 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
               </p>
               <p className="text-base font-semibold">{title}</p>
             </div>
+            {showEvaluatorSession ? (
+              <span
+                className={cn(
+                  "w-fit rounded-md border px-2 py-1 text-xs font-medium",
+                  evaluatorSessionActive
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                )}
+              >
+                Session: {evaluatorSessionActive ? "Active" : "Expired"}
+              </span>
+            ) : null}
             <nav className="flex gap-2 overflow-x-auto pb-1 md:hidden">
               {navItems.map((item) => {
                 const Icon = item.icon

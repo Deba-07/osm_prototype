@@ -42,6 +42,20 @@ import {
 } from "@/lib/upload-batches"
 import { canStartPdfProcessing } from "@/lib/pdf-processing"
 import { validateScriptMapping } from "@/lib/script-mappings"
+import {
+  getAdditionalScriptCandidates,
+  planAutomaticScriptDistribution,
+} from "@/lib/script-distribution"
+import { validateAdditionalScriptRequest } from "@/lib/additional-script-requests"
+import { additionalScriptRequests as initialAdditionalScriptRequests } from "@/data/additional-script-requests"
+import {
+  DEMO_OTP_CODE,
+  DEMO_OTP_DURATION_MS,
+  DEMO_SESSION_DURATION_MS,
+  MAX_DEMO_OTP_ATTEMPTS,
+  isDemoOtpExpired,
+  isDemoSessionActive,
+} from "@/lib/demo-auth"
 import type {
   AnswerSheet,
   AffiliatedCollege,
@@ -67,6 +81,13 @@ import type {
   ProcessedScript,
   ScriptMapping,
   ScriptMappingInput,
+  ScriptDistributionSummary,
+  AdditionalScriptRequest,
+  AdditionalScriptRequestInput,
+  DemoEvaluatorSession,
+  DemoOtpChallenge,
+  DemoOtpRequestResult,
+  DemoOtpVerificationResult,
 } from "@/types/osm"
 import { universityContext as initialUniversityContext } from "@/data/university"
 import { create } from "zustand"
@@ -74,6 +95,8 @@ import { createJSONStorage, persist } from "zustand/middleware"
 
 type OsmStoreState = {
   currentUser: MockUser | null
+  demoOtpChallenge: DemoOtpChallenge | null
+  evaluatorSession: DemoEvaluatorSession | null
   universityContext: typeof initialUniversityContext
   affiliatedColleges: AffiliatedCollege[]
   collegeImport: CollegeImportState
@@ -83,6 +106,8 @@ type OsmStoreState = {
   pdfProcessingJobs: PdfProcessingJob[]
   processedScripts: ProcessedScript[]
   scriptMappings: ScriptMapping[]
+  lastDistributionSummary: ScriptDistributionSummary | null
+  additionalScriptRequests: AdditionalScriptRequest[]
   students: Student[]
   exams: Exam[]
   questionPapers: QuestionPaper[]
@@ -96,6 +121,10 @@ type OsmStoreState = {
 type OsmStoreActions = {
   loginAsAdmin: () => void
   loginAsEvaluator: (evaluatorId: string) => boolean
+  requestDemoOtp: (identifier: string) => DemoOtpRequestResult
+  verifyDemoOtp: (code: string) => DemoOtpVerificationResult
+  verifyEvaluatorSession: (evaluatorId?: string) => boolean
+  endEvaluatorSession: () => void
   logout: () => void
   registerEvaluator: (input: EvaluatorRegistrationInput) => Evaluator
   createAnswerSheet: (input: AnswerSheetIntakeInput) => AnswerSheet | undefined
@@ -115,6 +144,18 @@ type OsmStoreActions = {
   createScriptMapping: (input: ScriptMappingInput) => ScriptMapping | undefined
   correctScriptMapping: (mappingId: string, studentId: string) => boolean
   reviewScriptMapping: (mappingId: string, notes?: string) => boolean
+  autoDistributeScripts: () => ScriptDistributionSummary
+  requestAdditionalScripts: (
+    input: AdditionalScriptRequestInput
+  ) => AdditionalScriptRequest | undefined
+  approveAdditionalScriptRequest: (
+    requestId: string,
+    reviewNote?: string
+  ) => AdditionalScriptRequest | undefined
+  rejectAdditionalScriptRequest: (
+    requestId: string,
+    reviewNote?: string
+  ) => boolean
   assignAnswerSheets: (
     input: AnswerSheetAssignmentInput
   ) => AnswerSheetAssignmentResult
@@ -186,6 +227,8 @@ function normalizeExamReferences<T extends { examId: string; subjectId: string }
 function cloneInitialState(): OsmStoreState {
   return {
     currentUser: null,
+    demoOtpChallenge: null,
+    evaluatorSession: null,
     universityContext: {
       ...initialUniversityContext,
       affiliatedCollegeIds: [...initialUniversityContext.affiliatedCollegeIds],
@@ -211,6 +254,10 @@ function cloneInitialState(): OsmStoreState {
     scriptMappings: initialScriptMappings.map((mapping) => ({
       ...mapping,
       validationIssues: [...mapping.validationIssues],
+    })),
+    lastDistributionSummary: null,
+    additionalScriptRequests: initialAdditionalScriptRequests.map((request) => ({
+      ...request,
     })),
     students: initialStudents.map((student) => ({ ...student })),
     exams: initialExams.map((exam) => ({ ...exam })),
@@ -273,7 +320,11 @@ export const useOsmStore = create<OsmStore>()(
     (set, get) => ({
       ...cloneInitialState(),
       loginAsAdmin: () => {
-        set({ currentUser: demoAdminUser })
+        set({
+          currentUser: demoAdminUser,
+          demoOtpChallenge: null,
+          evaluatorSession: null,
+        })
       },
       loginAsEvaluator: (evaluatorId) => {
         const evaluator = get().evaluators.find(
@@ -293,12 +344,147 @@ export const useOsmStore = create<OsmStore>()(
             evaluatorId: evaluator.id,
             departmentId: evaluator.departmentId,
           },
+          demoOtpChallenge: null,
+          evaluatorSession: null,
         })
 
         return true
       },
+      requestDemoOtp: (identifier) => {
+        const normalizedIdentifier = identifier.trim().toLowerCase()
+        const evaluator = get().evaluators.find(
+          (item) =>
+            item.id === identifier || item.email.toLowerCase() === normalizedIdentifier
+        )
+
+        if (!evaluator) {
+          return { success: false, message: "No evaluator matches that email." }
+        }
+
+        if (evaluator.status !== "approved") {
+          return {
+            success: false,
+            message: "Only approved evaluators can request a Demo OTP.",
+          }
+        }
+
+        const requestedAt = new Date()
+        const challenge: DemoOtpChallenge = {
+          id: createDemoId("otp"),
+          evaluatorId: evaluator.id,
+          code: DEMO_OTP_CODE,
+          status: "pending",
+          requestedAt: requestedAt.toISOString(),
+          expiresAt: new Date(
+            requestedAt.getTime() + DEMO_OTP_DURATION_MS
+          ).toISOString(),
+          attempts: 0,
+        }
+
+        set({
+          currentUser: {
+            id: `demo-user-${evaluator.id}`,
+            role: "evaluator",
+            name: evaluator.name,
+            email: evaluator.email,
+            evaluatorId: evaluator.id,
+            departmentId: evaluator.departmentId,
+          },
+          demoOtpChallenge: challenge,
+          evaluatorSession: null,
+        })
+
+        return { success: true, challenge }
+      },
+      verifyDemoOtp: (code) => {
+        const challenge = get().demoOtpChallenge
+        const evaluatorId = get().currentUser?.evaluatorId
+
+        if (!challenge || !evaluatorId || challenge.evaluatorId !== evaluatorId) {
+          return { success: false, message: "Request a new Demo OTP first." }
+        }
+
+        if (challenge.status === "failed") {
+          return {
+            success: false,
+            message: "Demo OTP attempts are exhausted. Request a new OTP.",
+          }
+        }
+
+        if (isDemoOtpExpired(challenge)) {
+          const expiredChallenge = { ...challenge, status: "expired" as const }
+          set({ demoOtpChallenge: expiredChallenge })
+          return {
+            success: false,
+            message: "Demo OTP expired. Request a new OTP.",
+          }
+        }
+
+        if (code.trim() !== challenge.code) {
+          const attempts = challenge.attempts + 1
+          const failed = attempts >= MAX_DEMO_OTP_ATTEMPTS
+          set({
+            demoOtpChallenge: {
+              ...challenge,
+              attempts,
+              status: failed ? "failed" : "pending",
+            },
+          })
+          return {
+            success: false,
+            message: failed
+              ? "Demo OTP attempts exhausted. Request a new OTP."
+              : "Invalid Demo OTP.",
+          }
+        }
+
+        const verifiedAt = new Date()
+        const session: DemoEvaluatorSession = {
+          id: createDemoId("session"),
+          evaluatorId,
+          status: "active",
+          startedAt: verifiedAt.toISOString(),
+          lastVerifiedAt: verifiedAt.toISOString(),
+          expiresAt: new Date(
+            verifiedAt.getTime() + DEMO_SESSION_DURATION_MS
+          ).toISOString(),
+        }
+        set({
+          demoOtpChallenge: {
+            ...challenge,
+            status: "verified",
+            verifiedAt: verifiedAt.toISOString(),
+          },
+          evaluatorSession: session,
+        })
+        return { success: true, session }
+      },
+      verifyEvaluatorSession: (evaluatorId) => {
+        const session = get().evaluatorSession
+        if (isDemoSessionActive(session, evaluatorId)) return true
+
+        if (session?.status === "active") {
+          set({ evaluatorSession: { ...session, status: "expired" } })
+        }
+        return false
+      },
+      endEvaluatorSession: () => {
+        const session = get().evaluatorSession
+        set({
+          currentUser: null,
+          evaluatorSession: session
+            ? { ...session, status: "ended" }
+            : null,
+        })
+      },
       logout: () => {
-        set({ currentUser: null })
+        const session = get().evaluatorSession
+        set({
+          currentUser: null,
+          evaluatorSession: session
+            ? { ...session, status: "ended" }
+            : null,
+        })
       },
       registerEvaluator: (input) => {
         const evaluator: Evaluator = {
@@ -717,6 +903,244 @@ export const useOsmStore = create<OsmStore>()(
 
         return true
       },
+      autoDistributeScripts: () => {
+        const state = get()
+        const contextByScript = new Map(
+          state.scriptMappings
+            .filter((mapping) => mapping.status === "valid")
+            .map((mapping) => {
+              const script = state.processedScripts.find(
+                (item) => item.id === mapping.scriptId
+              )
+              const batch = script
+                ? state.uploadBatches.find(
+                    (item) => item.id === script.uploadBatchId
+                  )
+                : undefined
+              const exam = batch
+                ? state.exams.find((item) => item.id === batch.examId)
+                : undefined
+              const student = mapping.studentId
+                ? state.students.find((item) => item.id === mapping.studentId)
+                : undefined
+
+              return [
+                mapping.scriptId,
+                script && exam && student && student.rollNumber === mapping.rollNumber
+                  ? { script, exam, student }
+                  : undefined,
+              ] as const
+            })
+            .filter((entry): entry is readonly [string, { script: ProcessedScript; exam: Exam; student: Student }] => Boolean(entry[1]))
+        )
+        const bridgeSheets: AnswerSheet[] = []
+
+        for (const [scriptId, context] of contextByScript) {
+          const hasBridge = state.answerSheets.some(
+            (sheet) => sheet.processedScriptId === scriptId
+          )
+          if (hasBridge) continue
+
+          const bridgeId = `as-script-${scriptId}`
+          bridgeSheets.push({
+            id: bridgeId,
+            studentId: context.student.id,
+            subjectId: context.exam.subjectId,
+            examId: context.exam.id,
+            semesterId: context.exam.semesterId,
+            pageImages: [
+              `/demo/answer-sheets/${bridgeId}/page-1.jpg`,
+              `/demo/answer-sheets/${bridgeId}/page-2.jpg`,
+            ],
+            processedScriptId: context.script.id,
+            status: "unassigned",
+          })
+        }
+
+        const answerSheetsWithBridges = [...state.answerSheets, ...bridgeSheets]
+        const plan = planAutomaticScriptDistribution({
+          scripts: state.processedScripts,
+          mappings: state.scriptMappings,
+          students: state.students,
+          batches: state.uploadBatches,
+          exams: state.exams,
+          evaluators: state.evaluators,
+          answerSheets: answerSheetsWithBridges,
+        })
+        const assignmentsByScript = new Map(
+          plan.assignments.map((assignment) => [assignment.scriptId, assignment])
+        )
+        const nextAnswerSheets = answerSheetsWithBridges.map((sheet) => {
+          const assignment = sheet.processedScriptId
+            ? assignmentsByScript.get(sheet.processedScriptId)
+            : undefined
+          return assignment
+            ? {
+                ...sheet,
+                assignedEvaluatorId: assignment.evaluatorId,
+                status: "assigned" as const,
+              }
+            : sheet
+        })
+        const completedPlan = planAutomaticScriptDistribution({
+          scripts: state.processedScripts,
+          mappings: state.scriptMappings,
+          students: state.students,
+          batches: state.uploadBatches,
+          exams: state.exams,
+          evaluators: state.evaluators,
+          answerSheets: nextAnswerSheets,
+        })
+
+        set({
+          answerSheets: nextAnswerSheets,
+          lastDistributionSummary: completedPlan.summary,
+        })
+
+        return completedPlan.summary
+      },
+      requestAdditionalScripts: (input) => {
+        const evaluator = get().evaluators.find(
+          (item) => item.id === input.evaluatorId
+        )
+        const validation = validateAdditionalScriptRequest({
+          input,
+          evaluator,
+          answerSheets: get().answerSheets,
+          requests: get().additionalScriptRequests,
+        })
+        if (!validation.success) return undefined
+
+        const request: AdditionalScriptRequest = {
+          id: createDemoId("additional-request"),
+          evaluatorId: input.evaluatorId,
+          requestedCount: input.requestedCount,
+          status: "pending",
+          reason: input.reason?.trim() || undefined,
+          requestedAt: new Date().toISOString(),
+        }
+        set((state) => ({
+          additionalScriptRequests: [
+            request,
+            ...state.additionalScriptRequests,
+          ],
+        }))
+        return request
+      },
+      approveAdditionalScriptRequest: (requestId, reviewNote) => {
+        const state = get()
+        const request = state.additionalScriptRequests.find(
+          (item) => item.id === requestId
+        )
+        const evaluator = request
+          ? state.evaluators.find((item) => item.id === request.evaluatorId)
+          : undefined
+        const evaluatorSheets = evaluator
+          ? state.answerSheets.filter(
+              (answerSheet) => answerSheet.assignedEvaluatorId === evaluator.id
+            )
+          : []
+        const evaluatorCanReceiveAdditional =
+          evaluator?.status === "approved" &&
+          evaluatorSheets.length > 0 &&
+          evaluatorSheets.every((answerSheet) => answerSheet.status === "completed")
+        if (
+          !request ||
+          request.status !== "pending" ||
+          !evaluator ||
+          !evaluatorCanReceiveAdditional
+        ) {
+          return undefined
+        }
+
+        const candidates = getAdditionalScriptCandidates({
+          evaluator,
+          requestedCount: request.requestedCount,
+          scripts: state.processedScripts,
+          mappings: state.scriptMappings,
+          students: state.students,
+          batches: state.uploadBatches,
+          exams: state.exams,
+          answerSheets: state.answerSheets,
+        })
+        const bridgeSheets: AnswerSheet[] = candidates
+          .filter((candidate) => !candidate.answerSheet)
+          .map((candidate) => {
+            const bridgeId = `as-script-${candidate.script.id}`
+            return {
+              id: bridgeId,
+              studentId: candidate.student.id,
+              subjectId: candidate.exam.subjectId,
+              examId: candidate.exam.id,
+              semesterId: candidate.exam.semesterId,
+              pageImages: [
+                `/demo/answer-sheets/${bridgeId}/page-1.jpg`,
+                `/demo/answer-sheets/${bridgeId}/page-2.jpg`,
+              ],
+              processedScriptId: candidate.script.id,
+              status: "unassigned" as const,
+            }
+          })
+        const answerSheetsWithBridges = [...state.answerSheets, ...bridgeSheets]
+        const selectedCandidates = getAdditionalScriptCandidates({
+          evaluator,
+          requestedCount: request.requestedCount,
+          scripts: state.processedScripts,
+          mappings: state.scriptMappings,
+          students: state.students,
+          batches: state.uploadBatches,
+          exams: state.exams,
+          answerSheets: answerSheetsWithBridges,
+        })
+        const selectedScriptIds = new Set(
+          selectedCandidates.map((candidate) => candidate.script.id)
+        )
+        const nextAnswerSheets = answerSheetsWithBridges.map((answerSheet) =>
+          answerSheet.processedScriptId && selectedScriptIds.has(answerSheet.processedScriptId)
+            ? {
+                ...answerSheet,
+                assignedEvaluatorId: evaluator.id,
+                status: "assigned" as const,
+              }
+            : answerSheet
+        )
+        const approvedRequest: AdditionalScriptRequest = {
+          ...request,
+          status: "approved",
+          approvedCount: selectedCandidates.length,
+          reviewedAt: new Date().toISOString(),
+          reviewNote: reviewNote?.trim() || undefined,
+        }
+
+        set((currentState) => ({
+          answerSheets: nextAnswerSheets,
+          additionalScriptRequests: currentState.additionalScriptRequests.map(
+            (item) => (item.id === requestId ? approvedRequest : item)
+          ),
+          lastDistributionSummary: null,
+        }))
+        return approvedRequest
+      },
+      rejectAdditionalScriptRequest: (requestId, reviewNote) => {
+        const request = get().additionalScriptRequests.find(
+          (item) => item.id === requestId
+        )
+        if (!request || request.status !== "pending") return false
+
+        set((state) => ({
+          additionalScriptRequests: state.additionalScriptRequests.map((item) =>
+            item.id === requestId
+              ? {
+                  ...item,
+                  status: "rejected" as const,
+                  reviewedAt: new Date().toISOString(),
+                  reviewNote: reviewNote?.trim() || undefined,
+                }
+              : item
+          ),
+        }))
+        return true
+      },
       assignAnswerSheets: (input) => {
         const validation = validateAssignment({
           input,
@@ -859,6 +1283,8 @@ export const useOsmStore = create<OsmStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         currentUser: state.currentUser,
+        demoOtpChallenge: state.demoOtpChallenge,
+        evaluatorSession: state.evaluatorSession,
         universityContext: state.universityContext,
         affiliatedColleges: state.affiliatedColleges,
         collegeImport: state.collegeImport,
@@ -868,6 +1294,8 @@ export const useOsmStore = create<OsmStore>()(
         pdfProcessingJobs: state.pdfProcessingJobs,
         processedScripts: state.processedScripts,
         scriptMappings: state.scriptMappings,
+        lastDistributionSummary: state.lastDistributionSummary,
+        additionalScriptRequests: state.additionalScriptRequests,
         students: state.students,
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,

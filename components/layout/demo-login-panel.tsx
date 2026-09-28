@@ -16,14 +16,15 @@ import { useOsmStore } from "@/stores/osm-store"
 import { ShieldCheck, UserCheck } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 
 export function DemoLoginPanel() {
   const router = useRouter()
   const isHydrated = useOsmStoreHydrated()
   const loginAsAdmin = useOsmStore((state) => state.loginAsAdmin)
-  const loginAsEvaluator = useOsmStore((state) => state.loginAsEvaluator)
+  const requestDemoOtp = useOsmStore((state) => state.requestDemoOtp)
   const evaluators = useOsmStore((state) => state.evaluators)
-  const [selectedEvaluatorId, setSelectedEvaluatorId] = useState("")
+  const [selectedEvaluatorEmail, setSelectedEvaluatorEmail] = useState("")
   const approvedEvaluators = useMemo(
     () => evaluators.filter((evaluator) => evaluator.status === "approved"),
     [evaluators]
@@ -35,9 +36,13 @@ export function DemoLoginPanel() {
   }
 
   function handleEvaluatorLogin() {
-    if (selectedEvaluatorId && loginAsEvaluator(selectedEvaluatorId)) {
-      router.push("/evaluator/dashboard")
+    if (!selectedEvaluatorEmail) return
+    const result = requestDemoOtp(selectedEvaluatorEmail)
+    if (!result.success) {
+      toast.error(result.message)
+      return
     }
+    router.push("/evaluator/verify")
   }
 
   return (
@@ -62,21 +67,21 @@ export function DemoLoginPanel() {
           <div className="space-y-2">
             {isHydrated ? (
               <>
-                <Label htmlFor="demo-evaluator">Approved Evaluator</Label>
+                <Label htmlFor="demo-evaluator">Approved evaluator email</Label>
                 <select
                   id="demo-evaluator"
                   className={cn(
                     "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   )}
-                  value={selectedEvaluatorId}
+                  value={selectedEvaluatorEmail}
                   onChange={(event) =>
-                    setSelectedEvaluatorId(event.target.value)
+                    setSelectedEvaluatorEmail(event.target.value)
                   }
                 >
                   <option value="">Select approved evaluator</option>
                   {approvedEvaluators.map((evaluator) => (
-                    <option key={evaluator.id} value={evaluator.id}>
-                      {evaluator.name} | {evaluator.designation}
+                    <option key={evaluator.id} value={evaluator.email}>
+                      {evaluator.email} | {evaluator.name}
                     </option>
                   ))}
                 </select>
@@ -84,11 +89,11 @@ export function DemoLoginPanel() {
                   type="button"
                   variant="outline"
                   className="h-12 w-full justify-start"
-                  disabled={!selectedEvaluatorId}
+                  disabled={!selectedEvaluatorEmail}
                   onClick={handleEvaluatorLogin}
                 >
                   <UserCheck data-icon="inline-start" className="size-4" />
-                  Evaluator
+                  Request Demo OTP
                 </Button>
               </>
             ) : (

@@ -308,6 +308,7 @@ export type AnswerSheet = {
   examId: string
   semesterId: string
   pageImages: string[]
+  processedScriptId?: string
   assignedEvaluatorId?: string
   status: AnswerSheetStatus
 }
@@ -361,3 +362,78 @@ export type EvaluationDraftInput = {
   evaluatorId: string
   questionMarks: QuestionMark[]
 }
+
+export type ScriptDistributionStatus =
+  | "not_distributed"
+  | "partially_distributed"
+  | "distributed"
+  | "capacity_reached"
+
+export type ScriptDistributionUnassigned = {
+  scriptId: string
+  studentId?: string
+  reason: string
+}
+
+export type ScriptDistributionSummary = {
+  eligibleScripts: number
+  eligibleEvaluators: number
+  defaultScriptsPerEvaluator: number
+  totalCapacity: number
+  distributed: number
+  remaining: number
+  status: ScriptDistributionStatus
+  unassigned: ScriptDistributionUnassigned[]
+}
+
+export type AdditionalScriptRequestStatus = "pending" | "approved" | "rejected"
+
+export type AdditionalScriptRequest = {
+  id: string
+  evaluatorId: string
+  requestedCount: number
+  status: AdditionalScriptRequestStatus
+  reason?: string
+  requestedAt: string
+  reviewedAt?: string
+  reviewNote?: string
+  approvedCount?: number
+}
+
+export type AdditionalScriptRequestInput = {
+  evaluatorId: string
+  requestedCount: number
+  reason?: string
+}
+
+export type OtpChallengeStatus = "pending" | "verified" | "expired" | "failed"
+
+export type DemoOtpChallenge = {
+  id: string
+  evaluatorId: string
+  code: string
+  status: OtpChallengeStatus
+  requestedAt: string
+  expiresAt: string
+  verifiedAt?: string
+  attempts: number
+}
+
+export type DemoSessionStatus = "active" | "expired" | "ended"
+
+export type DemoEvaluatorSession = {
+  id: string
+  evaluatorId: string
+  status: DemoSessionStatus
+  startedAt: string
+  lastVerifiedAt: string
+  expiresAt: string
+}
+
+export type DemoOtpRequestResult =
+  | { success: true; challenge: DemoOtpChallenge }
+  | { success: false; message: string }
+
+export type DemoOtpVerificationResult =
+  | { success: true; session: DemoEvaluatorSession }
+  | { success: false; message: string }

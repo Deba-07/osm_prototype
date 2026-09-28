@@ -137,4 +137,14 @@ export const answerSheets: AnswerSheet[] = [
     semesterId: "sem-4",
     plans: [],
   }),
+  ...Array.from({ length: 20 }, (_, index) => ({
+    id: `as-task19-demo-${String(index + 1).padStart(3, "0")}`,
+    studentId: cseStudents[index % cseStudents.length].id,
+    subjectId: "sub-cse-dbms",
+    examId: "exam-2026-sem4-cs204-regular",
+    semesterId: "sem-4",
+    pageImages: pageImages(`as-task19-demo-${String(index + 1).padStart(3, "0")}`),
+    assignedEvaluatorId: "eval-cse-task19-demo",
+    status: "completed" as const,
+  })),
 ]
