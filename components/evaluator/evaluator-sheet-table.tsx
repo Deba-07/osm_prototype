@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { answerSheetStatusLabels } from "@/lib/answer-sheets"
 import { getEvaluationSubmittedAt } from "@/lib/evaluator-dashboard"
-import type { Evaluation } from "@/types/osm"
+import type { Evaluation, EvaluationSession } from "@/types/osm"
 import type { ResolvedAnswerSheet } from "@/lib/answer-sheets"
 import type { AnswerSheetStatus } from "@/types/osm"
 import { ArrowRight } from "lucide-react"
@@ -22,6 +22,7 @@ type EvaluatorSheetTableProps = {
   evaluations: Evaluation[]
   emptyMessage: string
   mode: "active" | "completed"
+  activeEvaluationSession?: EvaluationSession
 }
 
 const statusClassNames: Record<AnswerSheetStatus, string> = {
@@ -69,6 +70,7 @@ export function EvaluatorSheetTable({
   evaluations,
   emptyMessage,
   mode,
+  activeEvaluationSession,
 }: EvaluatorSheetTableProps) {
   if (sheets.length === 0) {
     return (
@@ -95,6 +97,14 @@ export function EvaluatorSheetTable({
       </TableHeader>
       <TableBody>
         {sheets.map((sheet) => {
+          const scriptId = sheet.answerSheet.processedScriptId ?? sheet.answerSheet.id
+          const isBlockedByAnotherEvaluation = Boolean(
+            mode === "active" &&
+              activeEvaluationSession &&
+              activeEvaluationSession.scriptId !== scriptId &&
+              (activeEvaluationSession.status === "active" ||
+                activeEvaluationSession.status === "interrupted")
+          )
           const submittedAt = getEvaluationSubmittedAt({
             evaluations,
             evaluatorId,
@@ -133,20 +143,26 @@ export function EvaluatorSheetTable({
               </TableCell>
               {mode === "active" ? (
                 <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    render={
-                      <Link
-                        href={`/evaluator/evaluate/${sheet.answerSheet.id}`}
-                      />
-                    }
-                  >
-                    {sheet.answerSheet.status === "in_progress"
-                      ? "Continue"
-                      : "Open"}
-                    <ArrowRight data-icon="inline-end" className="size-4" />
-                  </Button>
+                  {isBlockedByAnotherEvaluation ? (
+                    <Button variant="outline" size="sm" disabled>
+                      Locked
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={
+                        <Link
+                          href={`/evaluator/evaluate/${sheet.answerSheet.id}`}
+                        />
+                      }
+                    >
+                      {sheet.answerSheet.status === "in_progress"
+                        ? "Continue"
+                        : "Open"}
+                      <ArrowRight data-icon="inline-end" className="size-4" />
+                    </Button>
+                  )}
                 </TableCell>
               ) : null}
             </TableRow>

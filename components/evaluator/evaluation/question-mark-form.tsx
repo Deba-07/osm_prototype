@@ -22,7 +22,7 @@ import type { Evaluation, EvaluationDraftInput } from "@/types/osm"
 import type { ExamQuestion, QuestionMark } from "@/types/osm"
 import { ArrowRight, CheckCircle2, Save } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 type QuestionMarkFormProps = {
@@ -38,7 +38,11 @@ type QuestionMarkFormProps = {
   nextAssignedSheetId?: string
   saveEvaluationDraft: (input: EvaluationDraftInput) => Evaluation | undefined
   submitEvaluation: (input: EvaluationDraftInput) => Evaluation | undefined
+  autoSaveEvaluation: (input: EvaluationDraftInput) => Evaluation | undefined
+  lastSavedAt?: string
 }
+
+type AutoSaveStatus = "idle" | "saving" | "saved" | "error"
 
 type MarkValueState = Record<string, string>
 
@@ -136,12 +140,15 @@ export function QuestionMarkForm({
   nextAssignedSheetId,
   saveEvaluationDraft,
   submitEvaluation,
+  autoSaveEvaluation,
+  lastSavedAt,
 }: QuestionMarkFormProps) {
   const [markValues, setMarkValues] = useState<MarkValueState>(() =>
     buildMarkValues(initialQuestionMarks)
   )
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false)
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>("saved")
   const initialSnapshot = useMemo(
     () => getSnapshot(buildMarkValues(initialQuestionMarks)),
     [initialQuestionMarks]
@@ -184,6 +191,40 @@ export function QuestionMarkForm({
       : {}),
   }
 
+  useEffect(() => {
+    if (readOnly || !hasUnsavedChanges || !draftValidation.success) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAutoSaveStatus("saving")
+      const savedEvaluation = autoSaveEvaluation({
+        answerSheetId,
+        evaluatorId,
+        questionMarks: draftValidation.questionMarks,
+      })
+
+      if (!savedEvaluation) {
+        setAutoSaveStatus("error")
+        return
+      }
+
+      const savedMarkValues = buildMarkValues(savedEvaluation.questionMarks)
+      setMarkValues(savedMarkValues)
+      setSavedSnapshot(getSnapshot(savedMarkValues))
+      setAutoSaveStatus("saved")
+    }, 650)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [
+    answerSheetId,
+    autoSaveEvaluation,
+    draftValidation,
+    evaluatorId,
+    hasUnsavedChanges,
+    readOnly,
+  ])
+
   function updateMarkValue(questionId: string, value: string) {
     setMarkValues((currentValues) => ({
       ...currentValues,
@@ -214,6 +255,7 @@ export function QuestionMarkForm({
     setMarkValues(savedMarkValues)
     setSavedSnapshot(getSnapshot(savedMarkValues))
     setHasTriedSubmit(false)
+    setAutoSaveStatus("saved")
     toast.success("Draft saved.")
   }
 
@@ -236,6 +278,18 @@ export function QuestionMarkForm({
       return
     }
 
+    const savedEvaluation = autoSaveEvaluation({
+      answerSheetId,
+      evaluatorId,
+      questionMarks: submissionValidation.questionMarks,
+    })
+
+    if (!savedEvaluation) {
+      setAutoSaveStatus("error")
+      toast.error("Latest marks could not be saved before submission.")
+      return
+    }
+
     const submittedEvaluation = submitEvaluation({
       answerSheetId,
       evaluatorId,
@@ -253,6 +307,7 @@ export function QuestionMarkForm({
 
     setMarkValues(submittedMarkValues)
     setSavedSnapshot(getSnapshot(submittedMarkValues))
+    setAutoSaveStatus("saved")
     setIsSubmitDialogOpen(false)
     toast.success("Evaluation submitted successfully.")
   }
@@ -296,10 +351,29 @@ export function QuestionMarkForm({
                   : "Enter awarded marks for each configured question."}
               </CardDescription>
             </div>
-            {hasUnsavedChanges && !readOnly ? (
-              <Badge variant="secondary">Unsaved changes</Badge>
+            {!readOnly ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Badge
+                  variant={autoSaveStatus === "error" ? "destructive" : "secondary"}
+                >
+                  Demo Auto-save: {autoSaveStatus === "saving"
+                    ? "Saving..."
+                    : autoSaveStatus === "error"
+                      ? "Unable to save"
+                      : "Saved"}
+                </Badge>
+                {hasUnsavedChanges && autoSaveStatus !== "saving" ? (
+                  <Badge variant="outline">Pending save</Badge>
+                ) : null}
+              </div>
             ) : null}
           </div>
+
+          {!readOnly && lastSavedAt ? (
+            <p className="text-xs text-muted-foreground">
+              Last saved: {formatSubmittedAt(lastSavedAt)}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-5">
           {readOnly ? (

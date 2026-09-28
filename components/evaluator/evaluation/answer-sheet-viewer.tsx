@@ -2,6 +2,12 @@
 
 import { Button } from "@/components/ui/button"
 import {
+  clampEvaluatorPage,
+  getEvaluatorVisiblePages,
+  PROTECTED_PAGE_COUNT,
+} from "@/lib/script-masking"
+import type { ProcessedScript } from "@/types/osm"
+import {
   Card,
   CardContent,
   CardDescription,
@@ -22,6 +28,8 @@ import { useMemo, useState } from "react"
 type AnswerSheetViewerProps = {
   answerSheetId: string
   pageImages: string[]
+  processedScript?: ProcessedScript
+  initialPage?: number
 }
 
 const minimumZoom = 75
@@ -35,28 +43,49 @@ function isModeledMissingDemoAsset(source: string) {
 export function AnswerSheetViewer({
   answerSheetId,
   pageImages,
+  processedScript,
+  initialPage,
 }: AnswerSheetViewerProps) {
-  const [currentPageIndex, setCurrentPageIndex] = useState(0)
+  const visiblePages = processedScript
+    ? getEvaluatorVisiblePages(processedScript)
+    : []
+  const initialMaskedPage =
+    processedScript && initialPage !== undefined
+      ? clampEvaluatorPage(processedScript, initialPage)
+      : visiblePages[0]?.pageNumber
+  const [currentPageIndex, setCurrentPageIndex] = useState(() =>
+    processedScript && initialMaskedPage !== undefined
+      ? Math.max(
+          visiblePages.findIndex((page) => page.pageNumber === initialMaskedPage),
+          0
+        )
+      : 0
+  )
   const [zoom, setZoom] = useState(100)
   const [failedSources, setFailedSources] = useState<Set<string>>(
     () => new Set()
   )
-  const pageCount = pageImages.length
+  const pageCount = processedScript ? visiblePages.length : pageImages.length
   const finalPageIndex = Math.max(pageCount - 1, 0)
   const safePageIndex = Math.min(currentPageIndex, finalPageIndex)
-  const currentPageSource = pageImages[safePageIndex]
+  const currentMaskedPage = processedScript ? visiblePages[safePageIndex] : undefined
+  const currentPageSource = processedScript ? undefined : pageImages[safePageIndex]
   const canShowImage = Boolean(
     currentPageSource &&
       !isModeledMissingDemoAsset(currentPageSource) &&
       !failedSources.has(currentPageSource)
   )
-  const pageLabel = useMemo(
-    () =>
-      pageCount > 0
-        ? `Page ${safePageIndex + 1} of ${pageCount}`
-        : "No scanned pages",
-    [pageCount, safePageIndex]
-  )
+  const pageLabel = useMemo(() => {
+    if (processedScript) {
+      return currentMaskedPage
+        ? `Page ${currentMaskedPage.pageNumber} of ${processedScript.pageCount}`
+        : "No evaluator-visible pages"
+    }
+
+    return pageCount > 0
+      ? `Page ${safePageIndex + 1} of ${pageCount}`
+      : "No scanned pages"
+  }, [currentMaskedPage, pageCount, processedScript, safePageIndex])
 
   function handleImageError(source: string) {
     setFailedSources((currentSources) => {
@@ -71,9 +100,13 @@ export function AnswerSheetViewer({
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle>Answer Sheet</CardTitle>
+            <CardTitle>
+              {processedScript ? "Secure Script Viewer" : "Answer Sheet"}
+            </CardTitle>
             <CardDescription>
-              Inspect scanned pages without changing saved marks.
+              {processedScript
+                ? `Pages 1-${PROTECTED_PAGE_COUNT} are protected from evaluator view.`
+                : "Inspect scanned pages without changing saved marks."}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -112,8 +145,56 @@ export function AnswerSheetViewer({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {processedScript ? (
+          <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 text-sm sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Script</p>
+              <p className="mt-1 font-medium">{processedScript.id}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total pages</p>
+              <p className="mt-1 font-medium">{processedScript.pageCount}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Protected pages</p>
+              <p className="mt-1 font-medium">
+                {Math.min(PROTECTED_PAGE_COUNT, processedScript.pageCount) > 0
+                  ? `1-${Math.min(PROTECTED_PAGE_COUNT, processedScript.pageCount)}`
+                  : "None"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Evaluator pages</p>
+              <p className="mt-1 font-medium">
+                {visiblePages.length > 0
+                  ? `${visiblePages[0].pageNumber}-${visiblePages[visiblePages.length - 1].pageNumber}`
+                  : "None"}
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="flex min-h-[36rem] items-start justify-center overflow-auto rounded-lg border bg-muted/20 p-4">
-          {canShowImage && currentPageSource ? (
+          {processedScript && currentMaskedPage ? (
+            <div
+              className="flex aspect-[3/4] w-full max-w-md flex-col items-center justify-center rounded-lg border border-dashed bg-background p-8 text-center shadow-sm"
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+              }}
+            >
+              <FileImage
+                className="mb-4 size-10 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-base font-medium">Mock answer script page</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Logical page {currentMaskedPage.pageNumber} is visible to this evaluator.
+              </p>
+              <p className="mt-4 text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                {processedScript.id}
+              </p>
+            </div>
+          ) : canShowImage && currentPageSource ? (
             <Image
               src={currentPageSource}
               alt={`${answerSheetId.toUpperCase()} scanned ${pageLabel}`}
@@ -152,7 +233,9 @@ export function AnswerSheetViewer({
               <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                 {pageCount > 0
                   ? "Sample scan asset is not available for this record."
-                  : "No sample scan asset is attached to this record."}
+                  : processedScript
+                    ? "This script has no evaluator-visible pages."
+                    : "No sample scan asset is attached to this record."}
               </p>
               <p className="mt-4 text-xs font-medium uppercase tracking-normal text-muted-foreground">
                 {answerSheetId}

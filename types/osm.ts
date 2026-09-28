@@ -161,6 +161,16 @@ export type ProcessedScript = {
   generatedAt: string
 }
 
+export type ProcessedPageStatus = "protected" | "evaluator_visible"
+
+export type ProcessedPage = {
+  id: string
+  scriptId: string
+  pageNumber: number
+  sourcePageNumber: number
+  status: ProcessedPageStatus
+}
+
 export type ScriptMappingStatus = "valid" | "review" | "invalid"
 
 export type ScriptMapping = {
@@ -328,6 +338,24 @@ export type QuestionMark = {
 }
 
 export type EvaluationStatus = "draft" | "submitted"
+
+export type EvaluationSessionStatus =
+  | "active"
+  | "interrupted"
+  | "completed"
+  | "ended"
+
+export type EvaluationSession = {
+  id: string
+  evaluatorId: string
+  scriptId: string
+  status: EvaluationSessionStatus
+  startedAt: string
+  lastSavedAt?: string
+  interruptedAt?: string
+  resumedAt?: string
+  completedAt?: string
+}
 
 export type Evaluation = {
   id: string

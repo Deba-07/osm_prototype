@@ -47,7 +47,15 @@ export function EvaluatorWorkPage({ mode }: EvaluatorWorkPageProps) {
   const answerSheets = useOsmStore((state) => state.answerSheets)
   const students = useOsmStore((state) => state.students)
   const evaluations = useOsmStore((state) => state.evaluations)
+  const evaluationSessions = useOsmStore((state) => state.evaluationSessions)
   const evaluator = getCurrentEvaluator(currentUser, evaluators)
+  const activeEvaluationSession = evaluator
+    ? evaluationSessions.find(
+        (session) =>
+          session.evaluatorId === evaluator.id &&
+          (session.status === "active" || session.status === "interrupted")
+      )
+    : undefined
   const scopedSheets = useMemo(
     () =>
       evaluator
@@ -149,6 +157,7 @@ export function EvaluatorWorkPage({ mode }: EvaluatorWorkPageProps) {
                 : "You have not completed any evaluations yet."
             }
             mode={isAssignedMode ? "active" : "completed"}
+            activeEvaluationSession={activeEvaluationSession}
           />
         </CardContent>
       </Card>

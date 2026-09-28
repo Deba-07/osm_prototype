@@ -64,6 +64,7 @@ import type {
   Exam,
   ExamInCharge,
   Evaluation,
+  EvaluationSession,
   EvaluationDraftInput,
   Evaluator,
   EvaluatorRegistrationInput,
@@ -116,6 +117,7 @@ type OsmStoreState = {
   evaluators: Evaluator[]
   answerSheets: AnswerSheet[]
   evaluations: Evaluation[]
+  evaluationSessions: EvaluationSession[]
 }
 
 type OsmStoreActions = {
@@ -163,6 +165,23 @@ type OsmStoreActions = {
     input: EvaluationDraftInput
   ) => Evaluation | undefined
   submitEvaluation: (input: EvaluationDraftInput) => Evaluation | undefined
+  startEvaluationSession: (input: {
+    evaluatorId: string
+    scriptId: string
+  }) => EvaluationSession | undefined
+  resumeEvaluationSession: (input: {
+    evaluatorId: string
+    scriptId: string
+  }) => EvaluationSession | undefined
+  autoSaveEvaluation: (input: EvaluationDraftInput) => Evaluation | undefined
+  interruptEvaluationSession: (input: {
+    evaluatorId: string
+    scriptId: string
+  }) => boolean
+  completeEvaluationSession: (input: {
+    evaluatorId: string
+    scriptId: string
+  }) => boolean
   resetDemo: () => void
 }
 
@@ -284,6 +303,7 @@ function cloneInitialState(): OsmStoreState {
         ...questionMark,
       })),
     })),
+    evaluationSessions: [],
   }
 }
 
@@ -475,6 +495,15 @@ export const useOsmStore = create<OsmStore>()(
           evaluatorSession: session
             ? { ...session, status: "ended" }
             : null,
+          evaluationSessions: get().evaluationSessions.map((item) =>
+            item.status === "active"
+              ? {
+                  ...item,
+                  status: "interrupted",
+                  interruptedAt: new Date().toISOString(),
+                }
+              : item
+          ),
         })
       },
       logout: () => {
@@ -484,6 +513,15 @@ export const useOsmStore = create<OsmStore>()(
           evaluatorSession: session
             ? { ...session, status: "ended" }
             : null,
+          evaluationSessions: get().evaluationSessions.map((item) =>
+            item.status === "active"
+              ? {
+                  ...item,
+                  status: "interrupted",
+                  interruptedAt: new Date().toISOString(),
+                }
+              : item
+          ),
         })
       },
       registerEvaluator: (input) => {
@@ -1174,6 +1212,148 @@ export const useOsmStore = create<OsmStore>()(
 
         return validation
       },
+      startEvaluationSession: ({ evaluatorId, scriptId }) => {
+        const existingSession = get().evaluationSessions.find(
+          (session) =>
+            session.evaluatorId === evaluatorId && session.scriptId === scriptId
+        )
+        const blockingSession = get().evaluationSessions.find(
+          (session) =>
+            session.evaluatorId === evaluatorId &&
+            (session.status === "active" || session.status === "interrupted")
+        )
+
+        if (blockingSession && blockingSession.scriptId !== scriptId) {
+          return undefined
+        }
+
+        if (existingSession?.status === "active") {
+          return existingSession
+        }
+
+        const now = new Date().toISOString()
+        const nextSession: EvaluationSession = existingSession
+          ? {
+              ...existingSession,
+              status: "active",
+              resumedAt: now,
+            }
+          : {
+              id: createDemoId("evaluation-session"),
+              evaluatorId,
+              scriptId,
+              status: "active",
+              startedAt: now,
+            }
+
+        set((state) => ({
+          evaluationSessions: state.evaluationSessions.some(
+            (session) => session.id === nextSession.id
+          )
+            ? state.evaluationSessions.map((session) =>
+                session.id === nextSession.id ? nextSession : session
+              )
+            : [...state.evaluationSessions, nextSession],
+          answerSheets: state.answerSheets.map((answerSheet) =>
+            (answerSheet.processedScriptId ?? answerSheet.id) === scriptId &&
+            answerSheet.assignedEvaluatorId === evaluatorId &&
+            answerSheet.status === "assigned"
+              ? { ...answerSheet, status: "in_progress" }
+              : answerSheet
+          ),
+        }))
+
+        return nextSession
+      },
+      resumeEvaluationSession: ({ evaluatorId, scriptId }) => {
+        const session = get().evaluationSessions.find(
+          (item) =>
+            item.evaluatorId === evaluatorId &&
+            item.scriptId === scriptId &&
+            item.status === "interrupted"
+        )
+
+        return session
+          ? get().startEvaluationSession({ evaluatorId, scriptId })
+          : undefined
+      },
+      autoSaveEvaluation: (input) => {
+        const savedEvaluation = get().saveEvaluationDraft(input)
+
+        if (!savedEvaluation) {
+          return undefined
+        }
+
+        const answerSheet = get().answerSheets.find(
+          (item) => item.id === input.answerSheetId
+        )
+        const scriptId = answerSheet?.processedScriptId ?? input.answerSheetId
+        const now = new Date().toISOString()
+
+        set((state) => ({
+          evaluationSessions: state.evaluationSessions.map((session) =>
+            session.evaluatorId === input.evaluatorId &&
+            session.scriptId === scriptId &&
+            session.status === "active"
+              ? { ...session, lastSavedAt: now }
+              : session
+          ),
+        }))
+
+        return savedEvaluation
+      },
+      interruptEvaluationSession: ({ evaluatorId, scriptId }) => {
+        const session = get().evaluationSessions.find(
+          (item) =>
+            item.evaluatorId === evaluatorId &&
+            item.scriptId === scriptId &&
+            item.status === "active"
+        )
+
+        if (!session) {
+          return false
+        }
+
+        set((state) => ({
+          evaluationSessions: state.evaluationSessions.map((item) =>
+            item.id === session.id
+              ? {
+                  ...item,
+                  status: "interrupted",
+                  interruptedAt: new Date().toISOString(),
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
+      completeEvaluationSession: ({ evaluatorId, scriptId }) => {
+        const session = get().evaluationSessions.find(
+          (item) =>
+            item.evaluatorId === evaluatorId &&
+            item.scriptId === scriptId &&
+            item.status === "active"
+        )
+
+        if (!session) {
+          return false
+        }
+
+        set((state) => ({
+          evaluationSessions: state.evaluationSessions.map((item) =>
+            item.id === session.id
+              ? {
+                  ...item,
+                  status: "completed",
+                  completedAt: new Date().toISOString(),
+                }
+              : item
+          ),
+        }))
+
+        return true
+      },
       saveEvaluationDraft: (input) => {
         const validation = validateEvaluationDraftInput({
           input,
@@ -1219,6 +1399,14 @@ export const useOsmStore = create<OsmStore>()(
                   status: "in_progress",
                 }
               : item
+          ),
+          evaluationSessions: state.evaluationSessions.map((session) =>
+            session.evaluatorId === validation.evaluator.id &&
+            session.scriptId ===
+              (validation.answerSheet.processedScriptId ?? validation.answerSheet.id) &&
+            session.status === "active"
+              ? { ...session, lastSavedAt: now }
+              : session
           ),
         }))
 
@@ -1272,6 +1460,12 @@ export const useOsmStore = create<OsmStore>()(
           ),
         }))
 
+        get().completeEvaluationSession({
+          evaluatorId: validation.evaluator.id,
+          scriptId:
+            validation.answerSheet.processedScriptId ?? validation.answerSheet.id,
+        })
+
         return submittedEvaluation
       },
       resetDemo: () => {
@@ -1300,6 +1494,7 @@ export const useOsmStore = create<OsmStore>()(
         evaluators: state.evaluators,
         answerSheets: state.answerSheets,
         evaluations: state.evaluations,
+        evaluationSessions: state.evaluationSessions,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<OsmStoreState> | undefined
@@ -1317,6 +1512,7 @@ export const useOsmStore = create<OsmStore>()(
           evaluations: persisted?.evaluations
             ? normalizeExamReferences(persisted.evaluations)
             : currentState.evaluations,
+          evaluationSessions: persisted?.evaluationSessions ?? currentState.evaluationSessions,
         }
       },
       version: 1,
