@@ -308,16 +308,21 @@ export function getCompatibleSubjectsForIntake({
 
 export function getCompatibleExamsForIntake({
   semesterId,
+  subjectId = "",
   exams,
 }: {
   semesterId: string
+  subjectId?: string
   exams: Exam[]
 }) {
-  if (semesterId.length === 0) {
-    return exams
-  }
+  return exams.filter((exam) => {
+    const matchesSemester =
+      semesterId.length === 0 || exam.semesterId === semesterId
+    const matchesSubject =
+      subjectId.length === 0 || exam.subjectId === subjectId
 
-  return exams.filter((exam) => exam.semesterId === semesterId)
+    return matchesSemester && matchesSubject
+  })
 }
 
 export function validateAnswerSheetIntakeInput({
@@ -371,6 +376,10 @@ export function validateAnswerSheetIntakeInput({
 
   if (subject && exam && subject.semesterId !== exam.semesterId) {
     fieldErrors.examId = "Select an exam for the selected subject semester."
+  }
+
+  if (subject && exam && exam.subjectId !== subject.id) {
+    fieldErrors.examId = "Select an exam configured for the selected subject."
   }
 
   if (Object.keys(fieldErrors).length > 0) {

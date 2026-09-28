@@ -3,18 +3,38 @@
 import { DemoSessionControls } from "@/components/layout/demo-session-controls"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { isDemoSessionActive } from "@/lib/demo-auth"
+import { useOsmStore } from "@/stores/osm-store"
 import type { LucideIcon } from "lucide-react"
 import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
+  ClipboardPenLine,
+  KeyRound,
   FileStack,
   LayoutDashboard,
+  Building2,
+  MapPinned,
+  UserRoundPlus,
+  Files,
+  Workflow,
+  GitBranch,
+  Shuffle,
   ListChecks,
   School,
   Trophy,
   UserCheck,
   Users,
+  AlertTriangle,
+  Activity,
+  FileArchive,
+  ClipboardPlus,
+  FileOutput,
+  ClipboardCheck,
+  WalletCards,
+  ShieldAlert,
+  BellRing,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -40,9 +60,99 @@ const adminNavigation: NavigationItem[] = [
     icon: LayoutDashboard,
   },
   {
+    href: "/admin/operations",
+    label: "Examination Operations",
+    icon: Activity,
+  },
+  {
     href: "/admin/students",
     label: "Students",
     icon: Users,
+  },
+  {
+    href: "/admin/institute",
+    label: "Institute",
+    icon: Building2,
+  },
+  {
+    href: "/admin/nodal-centres",
+    label: "Nodal Centres",
+    icon: MapPinned,
+  },
+  {
+    href: "/admin/uploaders",
+    label: "Uploaders",
+    icon: UserRoundPlus,
+  },
+  {
+    href: "/admin/upload-batches",
+    label: "Upload Batches",
+    icon: Files,
+  },
+  {
+    href: "/admin/pdf-processing",
+    label: "PDF Processing",
+    icon: Workflow,
+  },
+  {
+    href: "/admin/script-mappings",
+    label: "Script Mappings",
+    icon: GitBranch,
+  },
+  {
+    href: "/admin/distribution",
+    label: "Distribution",
+    icon: Shuffle,
+  },
+  {
+    href: "/admin/additional-script-requests",
+    label: "Additional Requests",
+    icon: ClipboardPenLine,
+  },
+  {
+    href: "/admin/evaluator-sessions",
+    label: "Evaluator Sessions",
+    icon: KeyRound,
+  },
+  {
+    href: "/admin/exceptions",
+    label: "Exception Queue",
+    icon: AlertTriangle,
+  },
+  {
+    href: "/admin/script-copies",
+    label: "Script Copies",
+    icon: FileArchive,
+  },
+  {
+    href: "/admin/adjustments",
+    label: "Adjustments",
+    icon: ClipboardPlus,
+  },
+  {
+    href: "/admin/result-export",
+    label: "Result Export",
+    icon: FileOutput,
+  },
+  {
+    href: "/admin/audit-trail",
+    label: "Audit Trail",
+    icon: ClipboardCheck,
+  },
+  {
+    href: "/admin/remuneration",
+    label: "Remuneration",
+    icon: WalletCards,
+  },
+  {
+    href: "/admin/conflicts",
+    label: "Conflict Control",
+    icon: ShieldAlert,
+  },
+  {
+    href: "/admin/alerts",
+    label: "Operational Alerts",
+    icon: BellRing,
   },
   {
     href: "/admin/evaluators",
@@ -87,6 +197,22 @@ const evaluatorNavigation: NavigationItem[] = [
     label: "Completed",
     icon: CheckCircle2,
   },
+  {
+    href: "/evaluator/remuneration",
+    label: "Remuneration",
+    icon: WalletCards,
+  },
+]
+
+const uploaderNavigation: NavigationItem[] = [
+  { href: "/uploader/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/uploader/upload-batches", label: "Upload Batches", icon: Files },
+]
+
+const superintendentNavigation: NavigationItem[] = [
+  { href: "/superintendent/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/superintendent/upload-batches", label: "Centre Uploads", icon: Files },
+  { href: "/superintendent/alerts", label: "Centre Alerts", icon: BellRing },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -95,6 +221,13 @@ function isActivePath(pathname: string, href: string) {
 
 function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
   const pathname = usePathname()
+  const currentUser = useOsmStore((state) => state.currentUser)
+  const evaluatorSession = useOsmStore((state) => state.evaluatorSession)
+  const showEvaluatorSession =
+    title === "Evaluator Workspace" && currentUser?.role === "evaluator"
+  const evaluatorSessionActive = showEvaluatorSession
+    ? isDemoSessionActive(evaluatorSession, currentUser.evaluatorId)
+    : false
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -153,6 +286,18 @@ function RoleShell({ title, subtitle, navItems, children }: RoleShellProps) {
               </p>
               <p className="text-base font-semibold">{title}</p>
             </div>
+            {showEvaluatorSession ? (
+              <span
+                className={cn(
+                  "w-fit rounded-md border px-2 py-1 text-xs font-medium",
+                  evaluatorSessionActive
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                )}
+              >
+                Session: {evaluatorSessionActive ? "Active" : "Expired"}
+              </span>
+            ) : null}
             <nav className="flex gap-2 overflow-x-auto pb-1 md:hidden">
               {navItems.map((item) => {
                 const Icon = item.icon
@@ -207,4 +352,12 @@ export function EvaluatorShell({ children }: { children: ReactNode }) {
       {children}
     </RoleShell>
   )
+}
+
+export function UploaderShell({ children }: { children: ReactNode }) {
+  return <RoleShell title="Nodal Centre Uploader" subtitle="Centre script intake" navItems={uploaderNavigation}>{children}</RoleShell>
+}
+
+export function SuperintendentShell({ children }: { children: ReactNode }) {
+  return <RoleShell title="Centre Superintendent" subtitle="Centre examination operations" navItems={superintendentNavigation}>{children}</RoleShell>
 }

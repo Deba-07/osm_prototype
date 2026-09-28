@@ -134,7 +134,11 @@ function getActiveExamId({
     (subject) => subject.id === activeSubjectId
   )
   const eligibleExams = selectedSubject
-    ? exams.filter((exam) => exam.semesterId === selectedSubject.semesterId)
+    ? exams.filter(
+        (exam) =>
+          exam.semesterId === selectedSubject.semesterId &&
+          exam.subjectId === selectedSubject.id
+      )
     : exams
 
   if (
@@ -372,6 +376,7 @@ export function RankingsPage() {
   const evaluators = useOsmStore((state) => state.evaluators)
   const answerSheets = useOsmStore((state) => state.answerSheets)
   const evaluations = useOsmStore((state) => state.evaluations)
+  const adminAdjustments = useOsmStore((state) => state.adminAdjustments)
   const [activeView, setActiveView] = useState<RankingView>("university")
   const [filters, setFilters] =
     useState<RankingFilterState>(defaultFilters)
@@ -389,8 +394,9 @@ export function RankingsPage() {
         programs,
         semesters,
         evaluators,
+        adminAdjustments,
       }),
-    [answerSheets, evaluations, evaluators, students]
+    [adminAdjustments, answerSheets, evaluations, evaluators, students]
   )
   const resultSubjectIds = useMemo(
     () => new Set(results.map((result) => result.subjectId)),

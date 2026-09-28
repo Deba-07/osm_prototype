@@ -3,6 +3,236 @@ export type UniversityContext = {
   name: string
   code: string
   academicYear: string
+  examInChargeId: string
+  city: string
+  state: string
+  country: string
+  pin: string
+  affiliatedCollegeIds: string[]
+}
+
+export type AffiliatedCollegeStatus = "active" | "inactive"
+
+export type AffiliatedCollege = {
+  id: string
+  name: string
+  code: string
+  city: string
+  state: string
+  instituteId: string
+  status: AffiliatedCollegeStatus
+  importedAt?: string
+}
+
+export type CollegeImportStatus =
+  | "ready"
+  | "processing"
+  | "imported"
+  | "validation_issue"
+
+export type CollegeImportState = {
+  status: CollegeImportStatus
+  importedCount: number
+  validationIssues: string[]
+  processedAt?: string
+}
+
+export type NodalCentreStatus = "active" | "inactive" | "pending"
+
+export type CentreSuperintendent = {
+  name: string
+  email: string
+  phone: string
+}
+
+export type NodalCentre = {
+  id: string
+  name: string
+  code: string
+  instituteId: string
+  affiliatedCollegeId: string
+  address: string
+  city: string
+  state: string
+  country: string
+  pin: string
+  superintendent: CentreSuperintendent
+  status: NodalCentreStatus
+  createdAt: string
+}
+
+export type UploaderStatus = "pending" | "approved" | "rejected"
+
+export type Uploader = {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  collegeId: string
+  nodalCentreId: string
+  status: UploaderStatus
+  registeredAt: string
+  approvedAt?: string
+  rejectedAt?: string
+  rejectionReason?: string
+}
+
+export type UploaderRegistrationInput = Pick<
+  Uploader,
+  "name" | "email" | "collegeId" | "nodalCentreId"
+> & {
+  phone?: string
+}
+
+export type ScannedPdfMetadata = {
+  fileName: string
+  fileSize: number
+  fileType: string
+  uploadedAt: string
+  demoReference: string
+}
+
+export type RollSheetMetadata = {
+  fileName: string
+  fileSize: number
+  fileType: string
+  uploadedAt: string
+  demoReference: string
+}
+
+export type UploadBatchStatus =
+  | "draft"
+  | "uploaded"
+  | "ready_for_processing"
+  | "failed"
+
+export type UploadBatch = {
+  id: string
+  batchNumber: string
+  nodalCentreId: string
+  uploaderId: string
+  examId: string
+  scannedPdf: ScannedPdfMetadata
+  rollSheet: RollSheetMetadata
+  status: UploadBatchStatus
+  uploadedAt: string
+  remarks?: string
+}
+
+export type UploadBatchInput = {
+  nodalCentreId: string
+  uploaderId: string
+  examId: string
+  scannedPdf: ScannedPdfMetadata
+  rollSheet: RollSheetMetadata
+  remarks?: string
+}
+
+export type PdfProcessingStatus =
+  | "received"
+  | "detecting_pages"
+  | "splitting_pages"
+  | "generating_scripts"
+  | "completed"
+  | "failed"
+
+export type PdfProcessingJob = {
+  id: string
+  uploadBatchId: string
+  status: PdfProcessingStatus
+  totalPages: number
+  detectedPages: number
+  processedPages: number
+  generatedScripts: number
+  progress: number
+  startedAt?: string
+  completedAt?: string
+  errorMessage?: string
+}
+
+export type ProcessedScript = {
+  id: string
+  uploadBatchId: string
+  pageCount: number
+  startPage: number
+  endPage: number
+  status: "generated"
+  coverPageProtected: boolean
+  generatedAt: string
+}
+
+export type ScriptExceptionType =
+  | "roll_number_mismatch"
+  | "missing_page"
+  | "duplicate_roll_number"
+  | "pdf_processing_error"
+  | "incomplete_script"
+  | "upload_problem"
+
+export type ScriptExceptionStatus = "open" | "under_review" | "resolved"
+
+export type ScriptException = {
+  id: string
+  scriptId: string
+  type: ScriptExceptionType
+  status: ScriptExceptionStatus
+  details: string
+  createdAt: string
+  updatedAt: string
+  reviewedAt?: string
+  resolvedAt?: string
+  resolutionNote?: string
+  createdBy?: string
+  reviewedBy?: string
+  resolvedBy?: string
+}
+
+export type EvaluationCopyType = "pre_evaluation" | "post_evaluation"
+
+export type EvaluationCopyStatus = "available" | "unavailable"
+
+export type EvaluationCopy = {
+  id: string
+  scriptId: string
+  type: EvaluationCopyType
+  createdAt: string
+  sourceVersion: string
+  status: EvaluationCopyStatus
+}
+
+export type ProcessedPageStatus = "protected" | "evaluator_visible"
+
+export type ProcessedPage = {
+  id: string
+  scriptId: string
+  pageNumber: number
+  sourcePageNumber: number
+  status: ProcessedPageStatus
+}
+
+export type ScriptMappingStatus = "valid" | "review" | "invalid"
+
+export type ScriptMapping = {
+  id: string
+  scriptId: string
+  studentId?: string
+  rollNumber?: string
+  startPage: number
+  endPage: number
+  pageCount: number
+  status: ScriptMappingStatus
+  validationIssues: string[]
+  reviewed: boolean
+  reviewedAt?: string
+  reviewNotes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ScriptMappingInput = {
+  scriptId: string
+  studentId?: string
+  rollNumber?: string
 }
 
 export type Department = {
@@ -57,6 +287,80 @@ export type Evaluator = {
   subjectExpertise: string[]
   experienceYears: number
   status: EvaluatorStatus
+  availability?: "available" | "unavailable"
+}
+
+export type OperationalConflictType = "nodal_centre_conflict" | "evaluator_unavailable"
+export type OperationalConflictStatus = "detected" | "under_review" | "resolved"
+
+export type OperationalConflict = {
+  id: string
+  type: OperationalConflictType
+  status: OperationalConflictStatus
+  examId?: string
+  nodalCentreId?: string
+  uploadBatchId?: string
+  evaluatorId?: string
+  affectedScriptIds: string[]
+  description: string
+  detectedAt: string
+  reviewedAt?: string
+  resolvedAt?: string
+  resolutionNote?: string
+}
+
+export type OperationalAlertType = "evaluation_deadline" | "evaluator_inactive" | "script_stuck" | "centre_upload_delayed" | "interrupted_evaluation" | "processing_failure"
+export type OperationalAlertSeverity = "info" | "warning" | "critical"
+export type OperationalAlertStatus = "active"
+
+export type OperationalAlert = {
+  id: string
+  type: OperationalAlertType
+  severity: OperationalAlertSeverity
+  title: string
+  message: string
+  createdAt: string
+  status: OperationalAlertStatus
+  examId?: string
+  evaluatorId?: string
+  scriptId?: string
+  uploadBatchId?: string
+  nodalCentreId?: string
+  processingJobId?: string
+  details: Record<string, string | number>
+}
+
+export type ExamPaperType = "regular" | "midterm" | "supplementary"
+
+export type ExamStatus = "draft" | "ready" | "scheduled" | "completed"
+
+export type ExamDocumentStatus = "draft" | "approved" | "published"
+
+export type QuestionPaper = {
+  id: string
+  title: string
+  fileName: string
+  uploadedAt: string
+  status: ExamDocumentStatus
+}
+
+export type MarkingScheme = {
+  id: string
+  title: string
+  totalMarks: number
+  passingMarks: number
+  version: string
+  uploadedAt: string
+  status: ExamDocumentStatus
+}
+
+export type ExamInCharge = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  departmentId: string
+  designation: string
 }
 
 export type Exam = {
@@ -64,6 +368,13 @@ export type Exam = {
   name: string
   academicYear: string
   semesterId: string
+  subjectId: string
+  paperType: ExamPaperType
+  examDate: string
+  questionPaperId: string
+  markingSchemeId: string
+  examInChargeId: string
+  status: ExamStatus
 }
 
 export type ExamQuestion = {
@@ -87,6 +398,7 @@ export type AnswerSheet = {
   examId: string
   semesterId: string
   pageImages: string[]
+  processedScriptId?: string
   assignedEvaluatorId?: string
   status: AnswerSheetStatus
 }
@@ -107,6 +419,24 @@ export type QuestionMark = {
 
 export type EvaluationStatus = "draft" | "submitted"
 
+export type EvaluationSessionStatus =
+  | "active"
+  | "interrupted"
+  | "completed"
+  | "ended"
+
+export type EvaluationSession = {
+  id: string
+  evaluatorId: string
+  scriptId: string
+  status: EvaluationSessionStatus
+  startedAt: string
+  lastSavedAt?: string
+  interruptedAt?: string
+  resumedAt?: string
+  completedAt?: string
+}
+
 export type Evaluation = {
   id: string
   answerSheetId: string
@@ -122,7 +452,59 @@ export type Evaluation = {
   submittedAt?: string
 }
 
-export type MockUserRole = "admin" | "evaluator"
+export type AdminAdjustment = {
+  id: string
+  evaluationId: string
+  scriptId: string
+  evaluatorMarks: number
+  adjustmentMarks: number
+  finalMarks: number
+  reason: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+}
+
+export type AuditAction =
+  | "evaluator_approved"
+  | "batch_uploaded"
+  | "pdf_processed"
+  | "script_assigned"
+  | "evaluation_started"
+  | "marks_saved"
+  | "evaluation_submitted"
+  | "admin_adjustment"
+  | "result_finalized"
+
+export type AuditLog = {
+  id: string
+  action: AuditAction
+  actorId?: string
+  actorName?: string
+  actorRole?: string
+  entityType?: string
+  entityId?: string
+  examId?: string
+  scriptId?: string
+  description: string
+  timestamp: string
+  metadata?: Record<string, string | number>
+}
+
+export type EvaluatorRemuneration = {
+  id: string
+  evaluatorId: string
+  examId?: string
+  completedScripts: number
+  ratePerScript: number
+  evaluationAmount: number
+  taDaAmount: number
+  totalAmount: number
+  status: "calculated"
+  calculatedAt: string
+}
+
+export type MockUserRole = "admin" | "evaluator" | "nodal_centre_uploader" | "centre_superintendent"
 
 export type MockUser = {
   id: string
@@ -131,6 +513,8 @@ export type MockUser = {
   email: string
   evaluatorId?: string
   departmentId?: string
+  uploaderId?: string
+  nodalCentreId?: string
 }
 
 export type EvaluatorRegistrationInput = Omit<Evaluator, "id" | "status">
@@ -140,3 +524,78 @@ export type EvaluationDraftInput = {
   evaluatorId: string
   questionMarks: QuestionMark[]
 }
+
+export type ScriptDistributionStatus =
+  | "not_distributed"
+  | "partially_distributed"
+  | "distributed"
+  | "capacity_reached"
+
+export type ScriptDistributionUnassigned = {
+  scriptId: string
+  studentId?: string
+  reason: string
+}
+
+export type ScriptDistributionSummary = {
+  eligibleScripts: number
+  eligibleEvaluators: number
+  defaultScriptsPerEvaluator: number
+  totalCapacity: number
+  distributed: number
+  remaining: number
+  status: ScriptDistributionStatus
+  unassigned: ScriptDistributionUnassigned[]
+}
+
+export type AdditionalScriptRequestStatus = "pending" | "approved" | "rejected"
+
+export type AdditionalScriptRequest = {
+  id: string
+  evaluatorId: string
+  requestedCount: number
+  status: AdditionalScriptRequestStatus
+  reason?: string
+  requestedAt: string
+  reviewedAt?: string
+  reviewNote?: string
+  approvedCount?: number
+}
+
+export type AdditionalScriptRequestInput = {
+  evaluatorId: string
+  requestedCount: number
+  reason?: string
+}
+
+export type OtpChallengeStatus = "pending" | "verified" | "expired" | "failed"
+
+export type DemoOtpChallenge = {
+  id: string
+  evaluatorId: string
+  code: string
+  status: OtpChallengeStatus
+  requestedAt: string
+  expiresAt: string
+  verifiedAt?: string
+  attempts: number
+}
+
+export type DemoSessionStatus = "active" | "expired" | "ended"
+
+export type DemoEvaluatorSession = {
+  id: string
+  evaluatorId: string
+  status: DemoSessionStatus
+  startedAt: string
+  lastVerifiedAt: string
+  expiresAt: string
+}
+
+export type DemoOtpRequestResult =
+  | { success: true; challenge: DemoOtpChallenge }
+  | { success: false; message: string }
+
+export type DemoOtpVerificationResult =
+  | { success: true; session: DemoEvaluatorSession }
+  | { success: false; message: string }

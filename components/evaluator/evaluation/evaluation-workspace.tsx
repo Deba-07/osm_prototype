@@ -34,7 +34,8 @@ import {
 import { useOsmStore } from "@/stores/osm-store"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo } from "react"
 
 type EvaluationWorkspaceProps = {
   answerSheetId: string
@@ -85,12 +86,54 @@ export function EvaluationWorkspace({
   const currentUser = useOsmStore((state) => state.currentUser)
   const evaluators = useOsmStore((state) => state.evaluators)
   const answerSheets = useOsmStore((state) => state.answerSheets)
+  const processedScripts = useOsmStore((state) => state.processedScripts)
+  const scriptMappings = useOsmStore((state) => state.scriptMappings)
   const students = useOsmStore((state) => state.students)
   const evaluations = useOsmStore((state) => state.evaluations)
   const saveEvaluationDraft = useOsmStore((state) => state.saveEvaluationDraft)
   const submitEvaluation = useOsmStore((state) => state.submitEvaluation)
+  const startEvaluationSession = useOsmStore(
+    (state) => state.startEvaluationSession
+  )
+  const interruptEvaluationSession = useOsmStore(
+    (state) => state.interruptEvaluationSession
+  )
+  const autoSaveEvaluation = useOsmStore((state) => state.autoSaveEvaluation)
+  const evaluationSessions = useOsmStore((state) => state.evaluationSessions)
+  const router = useRouter()
   const evaluator = getCurrentEvaluator(currentUser, evaluators)
   const answerSheet = answerSheets.find((sheet) => sheet.id === answerSheetId)
+  const processedScript = answerSheet?.processedScriptId
+    ? processedScripts.find((script) => script.id === answerSheet.processedScriptId)
+    : undefined
+  const scriptMapping = processedScript
+    ? scriptMappings.find((mapping) => mapping.scriptId === processedScript.id)
+    : undefined
+  const scriptId = processedScript?.id ?? answerSheet?.id
+  const currentEvaluationSession = evaluationSessions.find(
+    (session) =>
+      session.evaluatorId === evaluator?.id && session.scriptId === scriptId
+  )
+  const blockingEvaluationSession = evaluationSessions.find(
+    (session) =>
+      session.evaluatorId === evaluator?.id &&
+      (session.status === "active" || session.status === "interrupted") &&
+      session.scriptId !== scriptId
+  )
+
+  useEffect(() => {
+    if (
+      !isHydrated ||
+      !evaluator ||
+      !answerSheet ||
+      !scriptId ||
+      answerSheet.status === "completed"
+    ) {
+      return
+    }
+
+    startEvaluationSession({ evaluatorId: evaluator.id, scriptId })
+  }, [answerSheet, evaluator, isHydrated, scriptId, startEvaluationSession])
 
   const details = useMemo(
     () =>
@@ -240,9 +283,38 @@ export function EvaluationWorkspace({
     )
   }
 
+  if (blockingEvaluationSession) {
+    return (
+      <WorkspaceUnavailableState
+        title="Evaluation already active"
+        description={`Another evaluation is currently ${blockingEvaluationSession.status}. Resume or complete that script before opening this one.`}
+      />
+    )
+  }
+
+  if (processedScript && scriptMapping?.status !== "valid") {
+    return (
+      <WorkspaceUnavailableState
+        title="Script mapping is not valid"
+        description="This processed script is not available for evaluation until its Task 17 mapping has been validated."
+      />
+    )
+  }
+
   const isReadOnly = answerSheet.status === "completed"
   const studentName = details.student?.name ?? "Student unavailable"
   const subjectName = details.subject?.name ?? "Subject unavailable"
+  const sessionIsActive = currentEvaluationSession?.status === "active"
+
+  function handleInterrupt() {
+    if (!scriptId || !evaluator) {
+      return
+    }
+
+    if (interruptEvaluationSession({ evaluatorId: evaluator.id, scriptId })) {
+      router.push("/evaluator/dashboard")
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -258,11 +330,34 @@ export function EvaluationWorkspace({
         completion={persistedCompletion}
       />
 
+      <Card>
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1 text-sm">
+            <p className="font-medium">Evaluation Session</p>
+            <p className="text-muted-foreground">
+              Script: <span className="font-medium text-foreground">{scriptId}</span>
+              {sessionIsActive ? " · Active" : " · Restoring saved progress"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {currentEvaluationSession?.lastSavedAt
+                ? `Last saved: ${new Date(currentEvaluationSession.lastSavedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`
+                : "Demo auto-save will persist marks after a short pause."}
+            </p>
+          </div>
+          {!isReadOnly && sessionIsActive ? (
+            <Button type="button" variant="outline" onClick={handleInterrupt}>
+              Simulate Interruption
+            </Button>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.9fr)]">
         <AnswerSheetViewer
           key={answerSheet.id}
           answerSheetId={answerSheet.id}
           pageImages={answerSheet.pageImages}
+          processedScript={processedScript}
         />
         <QuestionMarkForm
           key={[
@@ -285,6 +380,8 @@ export function EvaluationWorkspace({
           nextAssignedSheetId={nextAssignedSheetId}
           saveEvaluationDraft={saveEvaluationDraft}
           submitEvaluation={submitEvaluation}
+          autoSaveEvaluation={autoSaveEvaluation}
+          lastSavedAt={currentEvaluationSession?.lastSavedAt}
         />
       </section>
     </div>

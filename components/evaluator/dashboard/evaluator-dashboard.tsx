@@ -32,7 +32,7 @@ import {
   type EvaluatorSubjectBreakdown,
 } from "@/lib/evaluator-dashboard"
 import { useOsmStore } from "@/stores/osm-store"
-import type { Department, Evaluator } from "@/types/osm"
+import type { Department, EvaluationSession, Evaluator } from "@/types/osm"
 import {
   ArrowRight,
   BookOpenCheck,
@@ -41,10 +41,12 @@ import {
   Clock3,
   Gauge,
   ListTodo,
+  Send,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import Link from "next/link"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
 
 function EvaluatorDashboardSkeleton() {
   return (
@@ -157,17 +159,109 @@ function EvaluatorStats({ stats }: { stats: EvaluatorDashboardStats }) {
   )
 }
 
+function AdditionalScriptRequestCard({
+  evaluatorId,
+  stats,
+  requests,
+  requestAdditionalScripts,
+}: {
+  evaluatorId: string
+  stats: EvaluatorDashboardStats
+  requests: ReturnType<typeof useOsmStore.getState>["additionalScriptRequests"]
+  requestAdditionalScripts: ReturnType<typeof useOsmStore.getState>["requestAdditionalScripts"]
+}) {
+  const [requestedCount, setRequestedCount] = useState("10")
+  const [reason, setReason] = useState(
+    "I have completed my assigned scripts and can take additional scripts."
+  )
+  const currentRequest = requests.find(
+    (request) => request.evaluatorId === evaluatorId
+  )
+  const isComplete =
+    stats.totalAssigned > 0 &&
+    stats.completed === stats.totalAssigned &&
+    stats.activeWorkload === 0
+
+  function handleSubmit() {
+    const request = requestAdditionalScripts({
+      evaluatorId,
+      requestedCount: Number(requestedCount),
+      reason,
+    })
+    if (!request) {
+      toast.error("Complete the current workload before requesting more scripts.")
+      return
+    }
+    toast.success("Additional script request submitted for admin review.")
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Additional Scripts</CardTitle>
+        <CardDescription>
+          Additional scripts require explicit admin approval and do not change the normal workload target.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {currentRequest?.status === "pending" ? (
+          <div className="rounded-lg border bg-muted/25 p-4 text-sm">
+            <p className="font-medium">Additional Script Request</p>
+            <p className="mt-2 text-muted-foreground">
+              Requested: <span className="font-medium text-foreground">{currentRequest.requestedCount}</span>
+            </p>
+            <Badge className="mt-3" variant="outline">Pending Admin Review</Badge>
+          </div>
+        ) : currentRequest?.status === "approved" ? (
+          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm">
+            <p className="font-medium text-emerald-700 dark:text-emerald-300">Request Approved</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <p>Requested: <span className="font-medium">{currentRequest.requestedCount}</span></p>
+              <p>Assigned: <span className="font-medium">{currentRequest.approvedCount ?? 0}</span></p>
+            </div>
+            {currentRequest.reviewNote ? <p className="mt-2 text-xs text-muted-foreground">{currentRequest.reviewNote}</p> : null}
+          </div>
+        ) : currentRequest?.status === "rejected" ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              <p className="font-medium text-destructive">Request Rejected</p>
+              <p className="mt-2 text-muted-foreground">{currentRequest.reviewNote ?? "Additional scripts are currently unavailable."}</p>
+            </div>
+            {isComplete ? <div className="grid gap-4 lg:grid-cols-[12rem_minmax(0,1fr)_auto] lg:items-end"><div className="space-y-2"><label htmlFor="additional-script-count-retry" className="text-sm font-medium">Number of scripts</label><input id="additional-script-count-retry" type="number" min="1" step="1" value={requestedCount} onChange={(event) => setRequestedCount(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" /></div><div className="space-y-2"><label htmlFor="additional-script-reason-retry" className="text-sm font-medium">Reason <span className="font-normal text-muted-foreground">(optional)</span></label><textarea id="additional-script-reason-retry" value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></div><Button onClick={handleSubmit}><Send data-icon="inline-start" className="size-4" />Request Again</Button></div> : null}
+          </div>
+        ) : isComplete ? (
+          <div className="grid gap-4 lg:grid-cols-[12rem_minmax(0,1fr)_auto] lg:items-end">
+            <div className="space-y-2"><label htmlFor="additional-script-count" className="text-sm font-medium">Number of scripts</label><input id="additional-script-count" type="number" min="1" step="1" value={requestedCount} onChange={(event) => setRequestedCount(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" /></div>
+            <div className="space-y-2"><label htmlFor="additional-script-reason" className="text-sm font-medium">Reason <span className="font-normal text-muted-foreground">(optional)</span></label><textarea id="additional-script-reason" value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></div>
+            <Button onClick={handleSubmit}><Send data-icon="inline-start" className="size-4" />Request Additional Scripts</Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Complete your current assigned workload before requesting additional scripts.</p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ContinueEvaluation({
   sheet,
+  session,
+  evaluation,
 }: {
   sheet: ResolvedAnswerSheet | undefined
+  session: EvaluationSession | undefined
+  evaluation: ReturnType<typeof useOsmStore.getState>["evaluations"][number] | undefined
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Continue Evaluation</CardTitle>
+        <CardTitle>
+          {session?.status === "interrupted"
+            ? "Interrupted Evaluation"
+            : "Active Evaluation"}
+        </CardTitle>
         <CardDescription>
-          Resume the in-progress answer sheet assigned to you.
+          Resume your saved evaluation progress before opening another script.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -188,8 +282,20 @@ function ContinueEvaluation({
                     {sheet.exam?.name ?? "Exam unavailable"}
                   </p>
                 </div>
-                <Badge variant="outline">In Progress</Badge>
+                  <Badge variant="outline">
+                    {session?.status === "interrupted" ? "Interrupted" : "Active"}
+                  </Badge>
               </div>
+              {evaluation ? (
+                <p className="text-sm text-muted-foreground">
+                  Saved draft: {evaluation.questionMarks.filter((mark) => mark.marksAwarded !== null).length} of {evaluation.questionMarks.length} questions answered
+                </p>
+              ) : null}
+              {session?.lastSavedAt ? (
+                <p className="text-xs text-muted-foreground">
+                  Last saved: {new Date(session.lastSavedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              ) : null}
             </div>
             <Button
               render={<Link href={`/evaluator/evaluate/${sheet.answerSheet.id}`} />}
@@ -212,10 +318,12 @@ function NextAssignedWork({
   sheets,
   evaluatorId,
   evaluations,
+  activeEvaluationSession,
 }: {
   sheets: Parameters<typeof EvaluatorSheetTable>[0]["sheets"]
   evaluatorId: string
   evaluations: Parameters<typeof EvaluatorSheetTable>[0]["evaluations"]
+  activeEvaluationSession?: EvaluationSession
 }) {
   return (
     <Card>
@@ -238,6 +346,7 @@ function NextAssignedWork({
           sheets={sheets}
           evaluatorId={evaluatorId}
           evaluations={evaluations}
+          activeEvaluationSession={activeEvaluationSession}
           emptyMessage="You have no pending assigned answer sheets."
           mode="active"
         />
@@ -362,6 +471,13 @@ export function EvaluatorDashboard() {
   const answerSheets = useOsmStore((state) => state.answerSheets)
   const students = useOsmStore((state) => state.students)
   const evaluations = useOsmStore((state) => state.evaluations)
+  const evaluationSessions = useOsmStore((state) => state.evaluationSessions)
+  const additionalScriptRequests = useOsmStore(
+    (state) => state.additionalScriptRequests
+  )
+  const requestAdditionalScripts = useOsmStore(
+    (state) => state.requestAdditionalScripts
+  )
 
   const evaluator = getCurrentEvaluator(currentUser, evaluators)
 
@@ -401,6 +517,28 @@ export function EvaluatorDashboard() {
           })
         : undefined,
     [evaluations, evaluator, evaluatorSheets]
+  )
+  const activeEvaluationSession = useMemo(
+    () =>
+      evaluator
+        ? evaluationSessions.find(
+            (session) =>
+              session.evaluatorId === evaluator.id &&
+              (session.status === "active" || session.status === "interrupted")
+          )
+        : undefined,
+    [evaluationSessions, evaluator]
+  )
+  const continueEvaluation = useMemo(
+    () =>
+      continueSheet
+        ? evaluations.find(
+            (evaluation) =>
+              evaluation.answerSheetId === continueSheet.answerSheet.id &&
+              evaluation.evaluatorId === evaluator?.id
+          )
+        : undefined,
+    [continueSheet, evaluations, evaluator]
   )
   const pendingSheets = useMemo(
     () =>
@@ -483,8 +621,19 @@ export function EvaluatorDashboard() {
 
       <EvaluatorStats stats={stats} />
 
+      <AdditionalScriptRequestCard
+        evaluatorId={evaluator.id}
+        stats={stats}
+        requests={additionalScriptRequests}
+        requestAdditionalScripts={requestAdditionalScripts}
+      />
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <ContinueEvaluation sheet={continueSheet} />
+        <ContinueEvaluation
+          sheet={continueSheet}
+          session={activeEvaluationSession}
+          evaluation={continueEvaluation}
+        />
         <SubjectWorkload breakdown={subjectBreakdown} />
       </section>
 
@@ -492,6 +641,7 @@ export function EvaluatorDashboard() {
         sheets={pendingSheets}
         evaluatorId={evaluator.id}
         evaluations={evaluations}
+        activeEvaluationSession={activeEvaluationSession}
       />
 
       <RecentActivityList activities={recentActivity} />

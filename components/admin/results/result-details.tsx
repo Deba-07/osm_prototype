@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -18,11 +19,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { DerivedResult } from "@/lib/results"
+import { CheckCircle2 } from "lucide-react"
 import type { ReactNode } from "react"
 
 type ResultDetailsProps = {
   result: DerivedResult | null
   onOpenChange: (open: boolean) => void
+  isFinalized?: boolean
+  onFinalize?: () => void
 }
 
 function formatMarks(value: number | null) {
@@ -68,7 +72,7 @@ function DetailItem({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-export function ResultDetails({ result, onOpenChange }: ResultDetailsProps) {
+export function ResultDetails({ result, onOpenChange, isFinalized = false, onFinalize }: ResultDetailsProps) {
   return (
     <Dialog open={Boolean(result)} onOpenChange={onOpenChange}>
       {result ? (
@@ -188,7 +192,9 @@ export function ResultDetails({ result, onOpenChange }: ResultDetailsProps) {
             </div>
           </div>
 
-          <DialogFooter showCloseButton />
+          <DialogFooter showCloseButton>
+            {isFinalized ? <span className="mr-auto text-sm font-medium text-emerald-700 dark:text-emerald-300">Result finalized</span> : <Button type="button" onClick={onFinalize}><CheckCircle2 data-icon="inline-start" className="size-4" />Finalize result</Button>}
+          </DialogFooter>
         </DialogContent>
       ) : null}
     </Dialog>

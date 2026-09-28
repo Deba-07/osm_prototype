@@ -88,7 +88,11 @@ export function RankingFilters({
     (subject) => subject.id === activeSubjectId
   )
   const filteredExams = selectedSubject
-    ? exams.filter((exam) => exam.semesterId === selectedSubject.semesterId)
+    ? exams.filter(
+        (exam) =>
+          exam.semesterId === selectedSubject.semesterId &&
+          exam.subjectId === selectedSubject.id
+      )
     : exams
 
   return (

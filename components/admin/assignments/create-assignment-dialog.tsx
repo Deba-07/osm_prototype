@@ -174,10 +174,15 @@ export function CreateAssignmentDialog({
   )
   const compatibleExams = useMemo(
     () =>
-      exams.filter(
-        (exam) => form.semesterId.length === 0 || exam.semesterId === form.semesterId
-      ),
-    [exams, form.semesterId]
+      exams.filter((exam) => {
+        const matchesSemester =
+          form.semesterId.length === 0 || exam.semesterId === form.semesterId
+        const matchesSubject =
+          form.subjectId.length === 0 || exam.subjectId === form.subjectId
+
+        return matchesSemester && matchesSubject
+      }),
+    [exams, form.semesterId, form.subjectId]
   )
   const eligibleSheets = useMemo(
     () =>
@@ -295,6 +300,7 @@ export function CreateAssignmentDialog({
     setForm((currentForm) => ({
       ...currentForm,
       subjectId: value,
+      examId: "",
       evaluatorId: "",
       answerSheetIds: [],
     }))
@@ -682,11 +688,15 @@ export function CreateAssignmentDialog({
                     aria-describedby={
                       fieldErrors.examId ? "assignment-exam-error" : undefined
                     }
-                    disabled={!form.semesterId}
+                    disabled={!form.semesterId || !form.subjectId}
                     onChange={(event) => handleExamChange(event.target.value)}
                   >
                     <option value="">
-                      {!form.semesterId ? "Select semester first" : "Select exam"}
+                      {!form.semesterId
+                        ? "Select semester first"
+                        : !form.subjectId
+                          ? "Select subject first"
+                          : "Select exam"}
                     </option>
                     {compatibleExams.map((exam) => (
                       <option key={exam.id} value={exam.id}>

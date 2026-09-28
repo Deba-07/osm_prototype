@@ -65,4 +65,16 @@ export const evaluators: Evaluator[] = [
     experienceYears: 3,
     status: "rejected",
   },
+  {
+    id: "eval-cse-task19-demo",
+    name: "Dr. Kavya Menon",
+    email: "kavya.menon@dsu.demo",
+    phone: "+91 98765 41026",
+    facultyId: "DSU-FAC-CSE-042",
+    departmentId: "dept-cse",
+    designation: "Associate Professor",
+    subjectExpertise: ["sub-cse-dbms"],
+    experienceYears: 10,
+    status: "approved",
+  },
 ]

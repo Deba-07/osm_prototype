@@ -12,11 +12,15 @@ import Link from "next/link"
 type EvaluatorAccessStateProps = {
   title: string
   description: string
+  actionHref?: string
+  actionLabel?: string
 }
 
 export function EvaluatorAccessState({
   title,
   description,
+  actionHref = "/login",
+  actionLabel = "Return to demo login",
 }: EvaluatorAccessStateProps) {
   return (
     <Card className="max-w-2xl">
@@ -28,9 +32,9 @@ export function EvaluatorAccessState({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button variant="outline" render={<Link href="/login" />}>
+        <Button variant="outline" render={<Link href={actionHref} />}>
           <ArrowLeft data-icon="inline-start" className="size-4" />
-          Return to demo login
+          {actionLabel}
         </Button>
       </CardContent>
     </Card>
